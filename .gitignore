@@ -4,7 +4,8 @@
 [Bb]uild/
 [Bb]uilds/
 Assets/AssetStoreTools*
-Assets/ML-Agents/Examples
+/Katie Soccer ML/Assets/ML-Agents/Examples
+/Katie Soccer ML/UnitySDK.log
 
 # Visual Studio cache directory
 .vs/
