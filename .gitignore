@@ -4,6 +4,7 @@
 [Bb]uild/
 [Bb]uilds/
 Assets/AssetStoreTools*
+Assets/ML-Agents/Examples
 
 # Visual Studio cache directory
 .vs/
