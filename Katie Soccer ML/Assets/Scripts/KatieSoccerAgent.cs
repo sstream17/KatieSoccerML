@@ -1,11 +1,10 @@
 ﻿using MLAgents;
-using System.Collections;
 using System.Linq;
 using UnityEngine;
 
-public class PieceAgent : Agent
+public class KatieSoccerAgent : Agent
 {
-    public PieceAcademy academy;
+    public KatieSoccerAcademy academy;
     public GameObject[] TeamPieces;
 
     /// <summary>

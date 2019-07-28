@@ -1,6 +1,6 @@
 ﻿using MLAgents;
 
-public class PieceAcademy : Academy
+public class KatieSoccerAcademy : Academy
 {
     /// <summary>
     /// The spawn area margin multiplier.

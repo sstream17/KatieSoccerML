@@ -2,7 +2,7 @@
 
 public class AIGoal : MonoBehaviour
 {
-    public PieceAgent agent;
+    public KatieSoccerAgent agent;
 
     void OnTriggerEnter(Collider collider)
     {
