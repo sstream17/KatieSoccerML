@@ -15,11 +15,12 @@ MonoBehaviour:
   brainParameters:
     vectorObservationSize: 360
     numStackedVectorObservations: 3
-    vectorActionSize: 02000000
+    vectorActionSize: 03000000
     cameraResolutions: []
     vectorActionDescriptions:
     - Force-X
     - Force-Y
+    - SelectedPiece
     vectorActionSpaceType: 1
   model: {fileID: 0}
   inferenceDevice: 0

@@ -6,6 +6,7 @@ using UnityEngine;
 public class PieceAgent : Agent
 {
     public PieceAcademy academy;
+    public GameObject[] TeamPieces;
 
     /// <summary>
     /// The goal to push the block to.
@@ -20,7 +21,7 @@ public class PieceAgent : Agent
     public AIGoal goalDetect;
 
     public Rigidbody ballRB;
-    public Rigidbody agentRB;
+    private Rigidbody[] teamRBs;
     public RayPerception rayPerception;
 
     private GameObject[] allPieces;
@@ -42,9 +43,16 @@ public class PieceAgent : Agent
 
     private void Start()
     {
-        allPieces = new GameObject[2];
-        allPieces[0] = gameObject;
-        allPieces[1] = ball;
+        teamRBs = new Rigidbody[TeamPieces.Length];
+        allPieces = new GameObject[TeamPieces.Length + 1];
+        int i = 0;
+        foreach (GameObject piece in TeamPieces)
+        {
+            Rigidbody rb = piece.GetComponent<Rigidbody>();
+            teamRBs[i] = rb;
+            allPieces[i] = piece;
+        }
+        allPieces[i] = ball;
 
         minStrength = Mathf.Sqrt(0.9f * 0.9f / 2);
         maxStrength = Mathf.Sqrt(5f * 5f / 2);
@@ -112,8 +120,10 @@ public class PieceAgent : Agent
 
         float x = ScaleAction(vectorAction[0], minStrength, maxStrength);
         float y = ScaleAction(vectorAction[1], minStrength, maxStrength);
+        int selectedPiece = Mathf.FloorToInt(ScaleAction(vectorAction[2], 0, TeamPieces.Length - 0.01f));
+
         Vector3 targetVector = new Vector3(x, y, 0f);
-        agentRB.AddForce(targetVector * speed);
+        teamRBs[selectedPiece].AddForce(targetVector * speed);
 
         //AddReward(-0.5f / agentParameters.maxStep);
     }
@@ -171,6 +181,5 @@ public class PieceAgent : Agent
         transform.position = GetRandomSpawnPos(transform.position);
         PieceMovement pieceMovement = gameObject.GetComponent<PieceMovement>();
         pieceMovement.SetStartingPositions();
-        agentRB.velocity = Vector3.zero;
     }
 }

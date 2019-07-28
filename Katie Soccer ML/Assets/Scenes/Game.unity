@@ -913,12 +913,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bb172294dbbcc408286b156a2c4b553c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!54 &1381143679 stripped
-Rigidbody:
-  m_CorrespondingSourceObject: {fileID: 409350870181283633, guid: faf9d6b6b88a608498b4b80bdc1326f4,
-    type: 3}
-  m_PrefabInstance: {fileID: 905266894}
-  m_PrefabAsset: {fileID: 0}
 --- !u!114 &1381143680
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -940,11 +934,12 @@ MonoBehaviour:
     onDemandDecision: 1
     numberOfActionsBetweenDecisions: 1
   academy: {fileID: 1479792064}
+  TeamPieces:
+  - {fileID: 1381143676}
   goal: {fileID: 805666504}
   ball: {fileID: 168641051}
   goalDetect: {fileID: 805666505}
   ballRB: {fileID: 168641053}
-  agentRB: {fileID: 1381143679}
   rayPerception: {fileID: 1381143678}
 --- !u!114 &1381143681
 MonoBehaviour:
