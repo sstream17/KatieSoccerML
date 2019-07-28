@@ -34,11 +34,11 @@ namespace MLAgents
                 endPosition = transform.TransformDirection(
                     PolarToCartesian(rayDistance, angle));
                 endPosition.z = endOffset;
-                //if (Application.isEditor)
-                //{
+                if (Application.isEditor)
+                {
                     Debug.DrawRay(transform.position + new Vector3(0f, startOffset, 0f),
                         endPosition, Color.black, 2f, true);
-                //}
+                }
 
                 float[] subList = new float[detectableObjects.Length + 2];
                 if (Physics.SphereCast(transform.position +

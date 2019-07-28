@@ -2,14 +2,16 @@
 
 public class AIGoal : MonoBehaviour
 {
-    public KatieSoccerAgent agent;
+    public KatieSoccerAgent ScoringAgent;
+    public KatieSoccerAgent DefendingAgent;
 
     void OnTriggerEnter(Collider collider)
     {
         // Touched goal.
         if (collider.gameObject.CompareTag("Ball"))
         {
-            agent.IScoredAGoal();
+            DefendingAgent.OpponentScored();
+            ScoringAgent.GoalScored();
         }
     }
 }

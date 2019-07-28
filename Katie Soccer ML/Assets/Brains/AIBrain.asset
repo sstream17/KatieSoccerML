@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: AIBrain
   m_EditorClassIdentifier: 
   brainParameters:
-    vectorObservationSize: 360
+    vectorObservationSize: 7200
     numStackedVectorObservations: 3
     vectorActionSize: 03000000
     cameraResolutions: []

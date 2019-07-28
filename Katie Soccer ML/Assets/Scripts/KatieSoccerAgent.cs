@@ -22,18 +22,19 @@ public class KatieSoccerAgent : Agent
     public Rigidbody ballRB;
     private Rigidbody[] teamRBs;
     public RayPerception rayPerception;
+    public bool AllowShot = false;
 
     private GameObject[] allPieces;
     private float minStrength;
     private float maxStrength;
     private float speed = 200f;
+    public float OffsetX = 0f;
+    public float OffsetY = 0f;
     private float MinX = -4.25f;
     private float MaxX = 4.25f;
-    private float MinZ = -3.9f;
-    private float MaxZ = 2.1f;
-    private bool allowShot = true;
-    private bool piecesMoving = false;
-    private bool piecesWereMoving = false;
+    private float MinY = -3.9f;
+    private float MaxY = 2.1f;
+    private float raycastStep = 0.5f;
 
     public override void InitializeAgent()
     {
@@ -50,6 +51,7 @@ public class KatieSoccerAgent : Agent
             Rigidbody rb = piece.GetComponent<Rigidbody>();
             teamRBs[i] = rb;
             allPieces[i] = piece;
+            i++;
         }
         allPieces[i] = ball;
 
@@ -59,36 +61,11 @@ public class KatieSoccerAgent : Agent
 
     void Update()
     {
-        if (allowShot)
+        if (AllowShot)
         {
-            allowShot = false;
-            Debug.Log("requesting decision");
+            AllowShot = false;
             RequestDecision();
         }
-        piecesMoving = !PiecesStoppedMoving(allPieces);
-        if (piecesMoving)
-        {
-            piecesWereMoving = true;
-        }
-
-        if (!piecesMoving && piecesWereMoving)
-        {
-            piecesWereMoving = false;
-            allowShot = true;
-        }
-    }
-
-    private bool PiecesStoppedMoving(GameObject[] pieces)
-    {
-        foreach (GameObject piece in pieces)
-        {
-            PieceMovement pieceMovement = piece.GetComponent<PieceMovement>();
-            if (pieceMovement.IsMoving)
-            {
-                return false;
-            }
-        }
-        return true;
     }
 
     public override void CollectObservations()
@@ -107,7 +84,11 @@ public class KatieSoccerAgent : Agent
         }
 
         var detectableObjects = new[] { "Ball", "Goal", "Wall", "Piece" };
-        AddVectorObs(rayPerception.Perceive(rayDistance, rayAngles, detectableObjects, 0f, 0f));
+        float startingPosition = -transform.position.z;
+        for (float j = startingPosition; j < rayDistance; j += raycastStep)
+        {
+            AddVectorObs(rayPerception.Perceive(rayDistance, rayAngles, detectableObjects, 0f, j));
+        }
     }
 
     public override void AgentAction(float[] vectorAction, string textAction)
@@ -124,18 +105,18 @@ public class KatieSoccerAgent : Agent
         Vector3 targetVector = new Vector3(x, y, 0f);
         teamRBs[selectedPiece].AddForce(targetVector * speed);
 
-        //AddReward(-0.5f / agentParameters.maxStep);
+        // TODO: Potentially add negative reward per shot taken
     }
 
     public Vector3 GetRandomSpawnPos(Vector3 currentPosition)
     {
-        float randomPositionX = Random.Range(
+        float randomPositionX = OffsetX + Random.Range(
             MinX * academy.spawnAreaMarginMultiplier,
             MaxX * academy.spawnAreaMarginMultiplier);
 
-        float randomPositionY = Random.Range(
-            MinZ * academy.spawnAreaMarginMultiplier,
-            MaxZ * academy.spawnAreaMarginMultiplier);
+        float randomPositionY = OffsetY + Random.Range(
+            MinY * academy.spawnAreaMarginMultiplier,
+            MaxY * academy.spawnAreaMarginMultiplier);
 
         Vector3 randomSpawnPos = new Vector3(randomPositionX, randomPositionY, currentPosition.z);
         return randomSpawnPos;
@@ -144,13 +125,18 @@ public class KatieSoccerAgent : Agent
     /// <summary>
     /// Called when the agent moves the block into the goal.
     /// </summary>
-    public void IScoredAGoal()
+    public void GoalScored()
     {
         // We use a reward of 5.
         AddReward(5f);
 
         // By marking an agent as done AgentReset() will be called automatically.
         Done();
+    }
+
+    public void OpponentScored()
+    {
+        AddReward(-5f);
     }
 
     /// <summary>
@@ -175,10 +161,12 @@ public class KatieSoccerAgent : Agent
     /// </summary>
 	public override void AgentReset()
     {
-        allowShot = true;
         ResetBlock();
-        transform.position = GetRandomSpawnPos(transform.position);
-        PieceMovement pieceMovement = gameObject.GetComponent<PieceMovement>();
-        pieceMovement.SetStartingPositions();
+        foreach (GameObject piece in TeamPieces)
+        {
+            piece.transform.position = GetRandomSpawnPos(piece.transform.position);
+            PieceMovement pieceMovement = piece.gameObject.GetComponent<PieceMovement>();
+            pieceMovement.SetStartingPositions();
+        }
     }
 }
