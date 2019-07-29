@@ -9,4 +9,6 @@ public class KatieSoccerAcademy : Academy
     /// The higher this value, the longer training time required.
     /// </summary>
 	public float spawnAreaMarginMultiplier;
+
+    public float TimePenalty = 500f;
 }

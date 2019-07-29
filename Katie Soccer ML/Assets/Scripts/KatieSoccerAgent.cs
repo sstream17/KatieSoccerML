@@ -5,6 +5,7 @@ using UnityEngine;
 public class KatieSoccerAgent : Agent
 {
     public KatieSoccerAcademy academy;
+    public KatieSoccerAgent opposingAgent;
     public GameObject[] TeamPieces;
 
     /// <summary>
@@ -19,14 +20,13 @@ public class KatieSoccerAgent : Agent
 
     public AIGoal goalDetect;
 
-    public Rigidbody ballRB;
     private Rigidbody[] teamRBs;
     public RayPerception rayPerception;
     public bool AllowShot = false;
 
     private GameObject[] allPieces;
-    private float minStrength;
-    private float maxStrength;
+    private float minStrength = 0.9f;
+    private float maxStrength = 5f;
     private float speed = 200f;
     public float OffsetX = 0f;
     public float OffsetY = 0f;
@@ -54,9 +54,6 @@ public class KatieSoccerAgent : Agent
             i++;
         }
         allPieces[i] = ball;
-
-        minStrength = Mathf.Sqrt(0.9f * 0.9f / 2);
-        maxStrength = Mathf.Sqrt(5f * 5f / 2);
     }
 
     void Update()
@@ -83,7 +80,7 @@ public class KatieSoccerAgent : Agent
             i++;
         }
 
-        var detectableObjects = new[] { "Ball", "Goal", "Wall", "Piece" };
+        var detectableObjects = new[] { "Ball", "TeamOneGoal", "TeamTwoGoal", "Wall", "TeamOnePiece", "TeamTwoPiece" };
         float startingPosition = -transform.position.z;
         for (float j = startingPosition; j < rayDistance; j += raycastStep)
         {
@@ -98,14 +95,23 @@ public class KatieSoccerAgent : Agent
             vectorAction[i] = Mathf.Clamp(vectorAction[i], -1f, 1f);
         }
 
-        float x = ScaleAction(vectorAction[0], minStrength, maxStrength);
-        float y = ScaleAction(vectorAction[1], minStrength, maxStrength);
-        int selectedPiece = Mathf.FloorToInt(ScaleAction(vectorAction[2], 0, TeamPieces.Length - 0.01f));
+        float magnitude = ScaleAction(vectorAction[0], minStrength, maxStrength);
+        float direction = ScaleAction(vectorAction[1], 0f, 2 * Mathf.PI);
+        int selectedPiece = Mathf.FloorToInt(ScaleAction(vectorAction[2], 0f, TeamPieces.Length - 0.01f));
 
-        Vector3 targetVector = new Vector3(x, y, 0f);
+        Vector3 targetVector = GetTargetVector(magnitude, direction);
         teamRBs[selectedPiece].AddForce(targetVector * speed);
 
-        // TODO: Potentially add negative reward per shot taken
+        // Penalty given each step to encourage agent to finish task quickly.
+        AddReward(-1f / academy.TimePenalty);
+    }
+
+    private Vector3 GetTargetVector(float magnitude, float direction)
+    {
+        float x = magnitude * Mathf.Cos(direction);
+        float y = magnitude * Mathf.Sin(direction);
+
+        return new Vector3(x, y, 0f);
     }
 
     public Vector3 GetRandomSpawnPos(Vector3 currentPosition)
@@ -132,6 +138,7 @@ public class KatieSoccerAgent : Agent
 
         // By marking an agent as done AgentReset() will be called automatically.
         Done();
+        opposingAgent.Done();
     }
 
     public void OpponentScored()
@@ -142,16 +149,10 @@ public class KatieSoccerAgent : Agent
     /// <summary>
     /// Resets the block position and velocities.
     /// </summary>
-    void ResetBlock()
+    void ResetBall()
     {
         // Get a random position for the block.
         ball.transform.position = GetRandomSpawnPos(ball.transform.position);
-
-        // Reset block velocity back to zero.
-        ballRB.velocity = Vector3.zero;
-
-        // Reset block angularVelocity back to zero.
-        ballRB.angularVelocity = Vector3.zero;
     }
 
 
@@ -161,9 +162,12 @@ public class KatieSoccerAgent : Agent
     /// </summary>
 	public override void AgentReset()
     {
-        ResetBlock();
+        ResetBall();
+
         foreach (GameObject piece in TeamPieces)
         {
+            Rigidbody rb = piece.GetComponent<Rigidbody>();
+            rb.velocity = Vector3.zero;
             piece.transform.position = GetRandomSpawnPos(piece.transform.position);
             PieceMovement pieceMovement = piece.gameObject.GetComponent<PieceMovement>();
             pieceMovement.SetStartingPositions();

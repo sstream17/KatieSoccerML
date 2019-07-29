@@ -18,8 +18,8 @@ MonoBehaviour:
     vectorActionSize: 03000000
     cameraResolutions: []
     vectorActionDescriptions:
-    - Force-X
-    - Force-Y
+    - Magnitude
+    - Direction
     - SelectedPiece
     vectorActionSpaceType: 1
   model: {fileID: 0}

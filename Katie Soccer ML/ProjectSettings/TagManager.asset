@@ -5,9 +5,16 @@ TagManager:
   serializedVersion: 2
   tags:
   - Ball
-  - Piece
   - Wall
-  - Goal
+  - ball
+  - wall
+  - blueAgent
+  - blueGoal
+  - redGoal
+  - TeamOnePiece
+  - TeamTwoPiece
+  - TeamOneGoal
+  - TeamTwoGoal
   layers:
   - Default
   - TransparentFX
