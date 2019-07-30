@@ -25,6 +25,7 @@ public class KatieSoccerAgent : Agent
     public bool AllowShot = false;
 
     private GameObject[] allPieces;
+    private float goalReward = 5f;
     private float minStrength = 0.9f;
     private float maxStrength = 5f;
     private float speed = 200f;
@@ -63,6 +64,10 @@ public class KatieSoccerAgent : Agent
             AllowShot = false;
             RequestDecision();
         }
+
+        var distanceToGoal = (ball.transform.position - goal.transform.position).magnitude;
+        var denominator = (distanceToGoal * goalReward) + 1;
+        AddReward(1 / denominator);
     }
 
     public override void CollectObservations()
@@ -134,7 +139,7 @@ public class KatieSoccerAgent : Agent
     public void GoalScored()
     {
         // We use a reward of 5.
-        AddReward(5f);
+        AddReward(goalReward);
 
         // By marking an agent as done AgentReset() will be called automatically.
         Done();
@@ -143,7 +148,7 @@ public class KatieSoccerAgent : Agent
 
     public void OpponentScored()
     {
-        AddReward(-5f);
+        AddReward(-goalReward);
     }
 
     /// <summary>
