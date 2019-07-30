@@ -66,8 +66,15 @@ public class KatieSoccerAgent : Agent
         }
 
         var distanceToGoal = (ball.transform.position - goal.transform.position).magnitude;
-        var denominator = (distanceToGoal * goalReward) + 1;
-        AddReward(1 / denominator);
+        var score = (distanceToGoal * goalReward) + 1;
+        if (distanceToGoal <= 5f)
+        {
+            AddReward(1 / score);
+        }
+        else
+        {
+            AddReward(-score / 100f);
+        }
     }
 
     public override void CollectObservations()
