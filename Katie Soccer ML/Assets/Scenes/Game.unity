@@ -413,7 +413,7 @@ MonoBehaviour:
     height: 80
     qualityLevel: 1
     timeScale: 20
-    targetFrameRate: 5
+    targetFrameRate: 8
   inferenceConfiguration:
     width: 1280
     height: 720
@@ -422,7 +422,7 @@ MonoBehaviour:
     targetFrameRate: 60
   resetParameters:
     resetParameters: []
-  spawnAreaMarginMultiplier: 0.9
+  spawnAreaMarginMultiplier: 0.8
   TimePenalty: 500
 --- !u!4 &1479792065
 Transform:
