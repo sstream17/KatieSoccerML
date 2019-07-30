@@ -25,7 +25,7 @@ public class KatieSoccerAgent : Agent
     public bool AllowShot = false;
 
     private GameObject[] allPieces;
-    private float goalReward = 5f;
+    private float goalReward = 10f;
     private float minStrength = 0.9f;
     private float maxStrength = 5f;
     private float speed = 200f;
@@ -73,7 +73,7 @@ public class KatieSoccerAgent : Agent
         }
         else
         {
-            AddReward(-score / 100f);
+            AddReward(-score / 1000f);
         }
     }
 
