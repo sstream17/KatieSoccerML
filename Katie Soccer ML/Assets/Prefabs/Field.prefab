@@ -309,7 +309,7 @@ GameObject:
   - component: {fileID: 3735518875968423334}
   - component: {fileID: 3735518875968423335}
   m_Layer: 0
-  m_Name: LeftGoal
+  m_Name: TeamOneGoal
   m_TagString: Wall
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -528,7 +528,7 @@ GameObject:
   - component: {fileID: 3735518876083925471}
   - component: {fileID: 3735518876083925470}
   m_Layer: 0
-  m_Name: GoalArea
+  m_Name: TeamOneGoalArea
   m_TagString: TeamOneGoal
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -726,7 +726,7 @@ GameObject:
   - component: {fileID: 3735518876738637595}
   - component: {fileID: 3735518876738637592}
   m_Layer: 0
-  m_Name: GoalArea
+  m_Name: TeamTwoGoalArea
   m_TagString: TeamTwoGoal
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -788,7 +788,7 @@ GameObject:
   - component: {fileID: 3735518876923164637}
   - component: {fileID: 3735518876923164634}
   m_Layer: 0
-  m_Name: RightGoal
+  m_Name: TeamTwoGoal
   m_TagString: Wall
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
