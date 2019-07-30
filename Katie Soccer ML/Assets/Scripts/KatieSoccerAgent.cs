@@ -7,6 +7,7 @@ public class KatieSoccerAgent : Agent
     public KatieSoccerAcademy academy;
     public KatieSoccerAgent opposingAgent;
     public GameObject[] TeamPieces;
+    public GameObject[] OpposingPieces;
 
     /// <summary>
     /// The goal to push the block to.
@@ -21,7 +22,6 @@ public class KatieSoccerAgent : Agent
     public AIGoal goalDetect;
 
     private Rigidbody[] teamRBs;
-    public RayPerception rayPerception;
     public bool AllowShot = false;
 
     private GameObject[] allPieces;
@@ -35,7 +35,6 @@ public class KatieSoccerAgent : Agent
     private float MaxX = 4.25f;
     private float MinY = -3.9f;
     private float MaxY = 2.1f;
-    private float raycastStep = 0.5f;
 
     public override void InitializeAgent()
     {
@@ -79,25 +78,17 @@ public class KatieSoccerAgent : Agent
 
     public override void CollectObservations()
     {
-        var rayDistance = 12f;
-        var angles = from angle in Enumerable.Range(0, 360)
-                     where angle % 6 == 0
-                     select angle;
-
-        float[] rayAngles = new float[angles.Count()];
-        int i = 0;
-        foreach (int angle in angles)
+        for (int i = 0; i < TeamPieces.Length; i++)
         {
-            rayAngles[i] = angle;
-            i++;
+            AddVectorObs(TeamPieces[i].transform.position);
         }
 
-        var detectableObjects = new[] { "Ball", "TeamOneGoal", "TeamTwoGoal", "Wall", "TeamOnePiece", "TeamTwoPiece" };
-        float startingPosition = -transform.position.z;
-        for (float j = startingPosition; j < rayDistance; j += raycastStep)
+        for (int i = 0; i < OpposingPieces.Length; i++)
         {
-            AddVectorObs(rayPerception.Perceive(rayDistance, rayAngles, detectableObjects, 0f, j));
+            AddVectorObs(OpposingPieces[i].transform.position);
         }
+
+        AddVectorObs(ball.transform.position);
     }
 
     public override void AgentAction(float[] vectorAction, string textAction)
