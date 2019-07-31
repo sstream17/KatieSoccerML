@@ -63,17 +63,6 @@ public class KatieSoccerAgent : Agent
             AllowShot = false;
             RequestDecision();
         }
-
-        var distanceToGoal = (ball.transform.position - goal.transform.position).magnitude;
-        var score = (distanceToGoal * goalReward) + 1;
-        if (distanceToGoal <= 5f)
-        {
-            AddReward(1 / score);
-        }
-        else
-        {
-            AddReward(-score / 1000f);
-        }
     }
 
     public override void CollectObservations()
@@ -104,6 +93,17 @@ public class KatieSoccerAgent : Agent
 
         Vector3 targetVector = GetTargetVector(magnitude, direction);
         teamRBs[selectedPiece].AddForce(targetVector * speed);
+
+        var distanceToGoal = (ball.transform.position - goal.transform.position).magnitude;
+        var score = (distanceToGoal * goalReward) + 1;
+        if (distanceToGoal <= 5f)
+        {
+            AddReward(1 / score);
+        }
+        else
+        {
+            AddReward(-score / 1000f);
+        }
 
         // Penalty given each step to encourage agent to finish task quickly.
         AddReward(-1f / academy.TimePenalty);
