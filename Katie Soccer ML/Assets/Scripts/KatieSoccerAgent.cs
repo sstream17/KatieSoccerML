@@ -1,4 +1,5 @@
 ﻿using MLAgents;
+using System.Collections;
 using System.Linq;
 using UnityEngine;
 
@@ -94,17 +95,6 @@ public class KatieSoccerAgent : Agent
         Vector3 targetVector = GetTargetVector(magnitude, direction);
         teamRBs[selectedPiece].AddForce(targetVector * speed);
 
-        var distanceToGoal = (ball.transform.position - goal.transform.position).magnitude;
-        var score = (distanceToGoal * goalReward) + 1;
-        if (distanceToGoal <= 5f)
-        {
-            AddReward(1 / score);
-        }
-        else
-        {
-            AddReward(-score / 1000f);
-        }
-
         // Penalty given each step to encourage agent to finish task quickly.
         AddReward(-1f / academy.TimePenalty);
     }
@@ -115,6 +105,23 @@ public class KatieSoccerAgent : Agent
         float y = magnitude * Mathf.Sin(direction);
 
         return new Vector3(x, y, 0f);
+    }
+
+    public IEnumerator ComputeDistanceScore()
+    {
+        PieceMovement ballMovement = ball.GetComponent<PieceMovement>();
+        AIBall aiBall = ball.GetComponent<AIBall>();
+        while (ballMovement.IsMoving)
+        {
+            var distanceToGoal = (ball.transform.position - goal.transform.position).magnitude;
+            var score = (distanceToGoal * goalReward) + 1;
+            if (distanceToGoal <= 5f)
+            {
+                AddReward(1 / score);
+            }
+            yield return new WaitForFixedUpdate();
+        }
+        aiBall.Hit = false;
     }
 
     public Vector3 GetRandomSpawnPos(Vector3 currentPosition)
