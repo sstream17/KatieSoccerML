@@ -7,13 +7,13 @@ public class AIBall : MonoBehaviour
     {
         if (!Hit)
         {
-            Hit = true;
             Collider collider = collision.collider;
             if (collider.tag.Contains("Piece"))
             {
                 KatieSoccerAgent katieSoccerAgent = collider.gameObject.GetComponentInParent<KatieSoccerAgent>();
                 if (katieSoccerAgent != null)
                 {
+                    Hit = true;
                     StartCoroutine(katieSoccerAgent.ComputeDistanceScore());
                 }
             }
