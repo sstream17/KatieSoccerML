@@ -27,6 +27,7 @@ public class KatieSoccerAgent : Agent
 
     private GameObject[] allPieces;
     private float goalReward = 10f;
+    private float minimumScoringDistance = 6f;
     private float minStrength = 0.9f;
     private float maxStrength = 5f;
     private float speed = 200f;
@@ -115,7 +116,7 @@ public class KatieSoccerAgent : Agent
         {
             var distanceToGoal = (ball.transform.position - goal.transform.position).magnitude;
             var score = (distanceToGoal * goalReward) + 1;
-            if (distanceToGoal <= 5f)
+            if (distanceToGoal <= minimumScoringDistance)
             {
                 AddReward(1 / score);
             }

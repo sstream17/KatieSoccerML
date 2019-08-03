@@ -141,15 +141,23 @@ public class AIGameScript : MonoBehaviour
     {
         if (currentTurn.Equals(Team.TeamOne))
         {
-            ////DarkenPieces(TeamTwoPieces);
-            ////IlluminatePieces(TeamOnePieces);
             TeamOneAgent.AllowShot = true;
         }
         else
         {
-            ////DarkenPieces(TeamOnePieces);
-            ////IlluminatePieces(TeamTwoPieces);
             TeamTwoAgent.AllowShot = true;
+        }
+    }
+
+    public void StartScoreForDistance()
+    {
+        if (currentTurn.Equals(Team.TeamOne))
+        {
+            StartCoroutine(TeamOneAgent.ComputeDistanceScore());
+        }
+        else
+        {
+            StartCoroutine(TeamTwoAgent.ComputeDistanceScore());
         }
     }
 }

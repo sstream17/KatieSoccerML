@@ -2,7 +2,9 @@
 
 public class AIBall : MonoBehaviour
 {
+    public AIGameScript GameScript;
     public bool Hit = false;
+
     private void OnCollisionEnter(Collision collision)
     {
         if (!Hit)
@@ -10,12 +12,8 @@ public class AIBall : MonoBehaviour
             Collider collider = collision.collider;
             if (collider.tag.Contains("Piece"))
             {
-                KatieSoccerAgent katieSoccerAgent = collider.gameObject.GetComponentInParent<KatieSoccerAgent>();
-                if (katieSoccerAgent != null)
-                {
-                    Hit = true;
-                    StartCoroutine(katieSoccerAgent.ComputeDistanceScore());
-                }
+                Hit = true;
+                GameScript.StartScoreForDistance();
             }
         }
     }
