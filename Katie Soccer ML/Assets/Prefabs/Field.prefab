@@ -96,6 +96,10 @@ MonoBehaviour:
   - {fileID: 3925296999340110034}
   - {fileID: 3925296999065469922}
   - {fileID: 3925296999775817184}
+  Walls:
+  - {fileID: 3735518875866089094}
+  - {fileID: 3735518875968423333}
+  - {fileID: 3735518876923164632}
   goal: {fileID: 3735518876083925469}
   ball: {fileID: 3735518876034528202}
   goalDetect: {fileID: 3735518876083925470}
@@ -532,6 +536,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8e67d0a441d197545ae67b234e2ac39f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  GameScript: {fileID: 3735518876647839913}
+  Hit: 0
 --- !u!1 &3735518876083925469
 GameObject:
   m_ObjectHideFlags: 0
@@ -656,6 +662,10 @@ MonoBehaviour:
   - {fileID: 3925296998443469276}
   - {fileID: 3925296998930436132}
   - {fileID: 3925296999599604648}
+  Walls:
+  - {fileID: 3735518875866089094}
+  - {fileID: 3735518875968423333}
+  - {fileID: 3735518876923164632}
   goal: {fileID: 3735518876738637593}
   ball: {fileID: 3735518876034528202}
   goalDetect: {fileID: 3735518876738637592}
