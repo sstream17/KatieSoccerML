@@ -1,6 +1,5 @@
 ﻿using MLAgents;
 using System.Collections;
-using System.Linq;
 using UnityEngine;
 
 public class KatieSoccerAgent : Agent
@@ -9,6 +8,7 @@ public class KatieSoccerAgent : Agent
     public KatieSoccerAgent opposingAgent;
     public GameObject[] TeamPieces;
     public GameObject[] OpposingPieces;
+    public GameObject[] Walls;
 
     /// <summary>
     /// The goal to push the block to.
@@ -25,8 +25,12 @@ public class KatieSoccerAgent : Agent
     private Rigidbody[] teamRBs;
     public bool AllowShot = false;
 
+    private Collider[] walls;
+    private int numberOfWalls = 12;
+
     private GameObject[] allPieces;
-    private float goalReward = 10f;
+    private int numberOfPieces = 3;
+    private float goalReward = 30f;
     private float minimumScoringDistance = 6f;
     private float minStrength = 0.9f;
     private float maxStrength = 5f;
@@ -47,15 +51,29 @@ public class KatieSoccerAgent : Agent
     {
         teamRBs = new Rigidbody[TeamPieces.Length];
         allPieces = new GameObject[TeamPieces.Length + 1];
-        int i = 0;
-        foreach (GameObject piece in TeamPieces)
+        int i;
+        for (i = 0; i < TeamPieces.Length; i++)
         {
+            GameObject piece = TeamPieces[i];
             Rigidbody rb = piece.GetComponent<Rigidbody>();
             teamRBs[i] = rb;
             allPieces[i] = piece;
-            i++;
         }
+
         allPieces[i] = ball;
+
+        walls = new Collider[numberOfWalls];
+
+        i = 0;
+        for (int j = 0; j < Walls.Length; j++)
+        {
+            Collider[] colliders = Walls[j].GetComponents<Collider>();
+            for (int k = 0; k < colliders.Length; k++)
+            {
+                walls[i] = colliders[k];
+                i++;
+            }
+        }
     }
 
     void Update()
@@ -69,14 +87,26 @@ public class KatieSoccerAgent : Agent
 
     public override void CollectObservations()
     {
-        for (int i = 0; i < TeamPieces.Length; i++)
+        for (int i = 0; i < numberOfPieces; i++)
         {
-            AddVectorObs(TeamPieces[i].transform.position);
+            if (i == 0)
+            {
+                AddVectorObs(TeamPieces[i].transform.position);
+            }
+            else
+            {
+                AddVectorObs(Vector3.zero);
+            }
         }
 
-        for (int i = 0; i < OpposingPieces.Length; i++)
+        for (int i = 0; i < numberOfPieces; i++)
         {
-            AddVectorObs(OpposingPieces[i].transform.position);
+            AddVectorObs(Vector3.zero);
+        }
+
+        for (int i = 0; i < walls.Length; i++)
+        {
+            AddVectorObs(walls[i].transform.position);
         }
 
         AddVectorObs(ball.transform.position);
@@ -111,18 +141,22 @@ public class KatieSoccerAgent : Agent
     public IEnumerator ComputeDistanceScore()
     {
         PieceMovement ballMovement = ball.GetComponent<PieceMovement>();
-        AIBall aiBall = ball.GetComponent<AIBall>();
+        var lastDistance = (ball.transform.position - goal.transform.position).magnitude;
         while (ballMovement.IsMoving)
         {
             var distanceToGoal = (ball.transform.position - goal.transform.position).magnitude;
-            var score = (distanceToGoal * goalReward) + 1;
-            if (distanceToGoal <= minimumScoringDistance)
+            if (distanceToGoal < lastDistance)
             {
-                AddReward(1 / score);
+                var score = (distanceToGoal * goalReward) + 1;
+                if (distanceToGoal <= minimumScoringDistance)
+                {
+                    AddReward(1 / score);
+                }
             }
+            
+            lastDistance = distanceToGoal;
             yield return new WaitForFixedUpdate();
         }
-        aiBall.Hit = false;
     }
 
     public Vector3 GetRandomSpawnPos(Vector3 currentPosition)

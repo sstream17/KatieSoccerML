@@ -2,19 +2,39 @@
 
 public class AIBall : MonoBehaviour
 {
-    public AIGameScript GameScript;
+    public AIGameScriptOneTeam GameScript;
+    private PieceMovement pieceMovement;
     public bool Hit = false;
 
-    private void OnCollisionEnter(Collision collision)
+    private bool wasMoving = false;
+
+    private void Start()
     {
-        if (!Hit)
+        pieceMovement = GetComponent<PieceMovement>();
+    }
+
+    private void Update()
+    {
+        if (pieceMovement.IsMoving && !wasMoving)
         {
-            Collider collider = collision.collider;
-            if (collider.tag.Contains("Piece"))
-            {
-                Hit = true;
-                GameScript.StartScoreForDistance();
-            }
+            Hit = true;
+        }
+
+        if (pieceMovement.IsMoving)
+        {
+            wasMoving = true;
+        }
+        else
+        {
+            wasMoving = false;
+        }
+    }
+
+    private void FixedUpdate()
+    {
+        if (Hit)
+        {
+            GameScript.StartScoreForDistance();
         }
     }
 }
