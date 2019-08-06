@@ -185,12 +185,11 @@ public class KatieSoccerAgent : Agent
     /// </summary>
     public void GoalScored()
     {
-        // We use a reward of 5.
         AddReward(goalReward);
 
         // By marking an agent as done AgentReset() will be called automatically.
         Done();
-        opposingAgent.Done();
+        ////opposingAgent.Done();
     }
 
     public void OpponentScored()
