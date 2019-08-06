@@ -1,5 +1,6 @@
 ﻿using MLAgents;
 using System.Collections;
+using TMPro;
 using UnityEngine;
 
 public class KatieSoccerAgent : Agent
@@ -9,6 +10,7 @@ public class KatieSoccerAgent : Agent
     public GameObject[] TeamPieces;
     public GameObject[] OpposingPieces;
     public GameObject[] Walls;
+    public TextMeshProUGUI Score;
 
     /// <summary>
     /// The goal to push the block to.
@@ -82,6 +84,11 @@ public class KatieSoccerAgent : Agent
         {
             AllowShot = false;
             RequestDecision();
+        }
+
+        if (Score != null)
+        {
+            Score.text = GetCumulativeReward().ToString();
         }
     }
 
