@@ -10,7 +10,10 @@ public class AIGoal : MonoBehaviour
         if (collider.gameObject.CompareTag("Ball"))
         {
             ////DefendingAgent.OpponentScored();
-            ScoringAgent.GoalScored();
+            if (ScoringAgent != null)
+            {
+                ScoringAgent.GoalScored();
+            }
         }
     }
 }
