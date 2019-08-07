@@ -32,7 +32,7 @@ public class KatieSoccerAgent : Agent
 
     private GameObject[] allPieces;
     private int numberOfPieces = 3;
-    private float goalReward = 30f;
+    private float goalReward = 100f;
     private float minimumScoringDistance = 6f;
     private float minStrength = 0.9f;
     private float maxStrength = 5f;
