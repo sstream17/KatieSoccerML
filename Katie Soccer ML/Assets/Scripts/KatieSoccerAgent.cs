@@ -10,7 +10,6 @@ public class KatieSoccerAgent : Agent
     public GameObject[] TeamPieces;
     public GameObject[] OpposingPieces;
     public GameObject[] Walls;
-    public TextMeshProUGUI Score;
 
     /// <summary>
     /// The goal to push the block to.
@@ -43,6 +42,8 @@ public class KatieSoccerAgent : Agent
     private float MaxX = 4.25f;
     private float MinY = -3.9f;
     private float MaxY = 2.1f;
+    private float ballZ = -0.35f;
+    private float pieceZ = -0.3f;
 
     public override void InitializeAgent()
     {
@@ -84,11 +85,6 @@ public class KatieSoccerAgent : Agent
         {
             AllowShot = false;
             RequestDecision();
-        }
-
-        if (Score != null)
-        {
-            Score.text = GetCumulativeReward().ToString();
         }
     }
 
@@ -166,7 +162,7 @@ public class KatieSoccerAgent : Agent
         }
     }
 
-    public Vector3 GetRandomSpawnPos(Vector3 currentPosition)
+    public Vector3 GetRandomSpawnPos(float currentPositionZ)
     {
         float randomPositionX = OffsetX + Random.Range(
             MinX * academy.spawnAreaMarginMultiplier,
@@ -176,7 +172,7 @@ public class KatieSoccerAgent : Agent
             MinY * academy.spawnAreaMarginMultiplier,
             MaxY * academy.spawnAreaMarginMultiplier);
 
-        Vector3 randomSpawnPos = new Vector3(randomPositionX, randomPositionY, currentPosition.z);
+        Vector3 randomSpawnPos = new Vector3(randomPositionX, randomPositionY, currentPositionZ);
         return randomSpawnPos;
     }
 
@@ -203,7 +199,7 @@ public class KatieSoccerAgent : Agent
     void ResetBall()
     {
         // Get a random position for the block.
-        ball.transform.position = GetRandomSpawnPos(ball.transform.position);
+        ball.transform.position = GetRandomSpawnPos(ballZ);
     }
 
 
@@ -219,7 +215,7 @@ public class KatieSoccerAgent : Agent
         {
             Rigidbody rb = piece.GetComponent<Rigidbody>();
             rb.velocity = Vector3.zero;
-            piece.transform.position = GetRandomSpawnPos(piece.transform.position);
+            piece.transform.position = GetRandomSpawnPos(pieceZ);
             PieceMovement pieceMovement = piece.gameObject.GetComponent<PieceMovement>();
             pieceMovement.SetStartingPositions();
         }
