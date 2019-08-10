@@ -3,13 +3,17 @@
 public class AIGoal : MonoBehaviour
 {
     public KatieSoccerAgent ScoringAgent;
-    ////public KatieSoccerAgent DefendingAgent;
+    public KatieSoccerAgent DefendingAgent;
 
     void OnTriggerEnter(Collider collider)
     {
         if (collider.gameObject.CompareTag("Ball"))
         {
-            ////DefendingAgent.OpponentScored();
+            if (DefendingAgent != null)
+            {
+                DefendingAgent.OpponentScored();
+            }
+            
             if (ScoringAgent != null)
             {
                 ScoringAgent.GoalScored();

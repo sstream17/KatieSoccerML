@@ -493,6 +493,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ScoringAgent: {fileID: 1708505073}
+  DefendingAgent: {fileID: 0}
 --- !u!1 &305052624
 GameObject:
   m_ObjectHideFlags: 0
@@ -738,6 +739,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ScoringAgent: {fileID: 0}
+  DefendingAgent: {fileID: 1708505073}
 --- !u!65 &805666506
 BoxCollider:
   m_ObjectHideFlags: 0
