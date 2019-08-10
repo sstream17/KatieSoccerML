@@ -22,7 +22,7 @@ namespace MLAgents
         /// <param name="detectableObjects">List of tags which correspond to object types agent can see</param>
         /// <param name="startOffset">Starting height offset of ray from center of agent.</param>
         /// <param name="endOffset">Ending height offset of ray from center of agent.</param>
-        public override List<float> Perceive(float rayDistance,
+        public override List<float> Perceive(Transform startingTransform, float rayDistance,
             float[] rayAngles, string[] detectableObjects,
             float startOffset, float endOffset)
         {
@@ -31,17 +31,17 @@ namespace MLAgents
             // along with object distance.
             foreach (float angle in rayAngles)
             {
-                endPosition = transform.TransformDirection(
+                endPosition = startingTransform.TransformDirection(
                     PolarToCartesian(rayDistance, angle));
                 endPosition.z = endOffset;
                 if (Application.isEditor)
                 {
-                    Debug.DrawRay(transform.position + new Vector3(0f, startOffset, 0f),
+                    Debug.DrawRay(startingTransform.position + new Vector3(0f, startOffset, 0f),
                         endPosition, Color.black, 2f, true);
                 }
 
                 float[] subList = new float[detectableObjects.Length + 2];
-                if (Physics.SphereCast(transform.position +
+                if (Physics.SphereCast(startingTransform.position +
                                        new Vector3(0f, startOffset, 0f), 0.5f,
                     endPosition, out hit, rayDistance))
                 {
