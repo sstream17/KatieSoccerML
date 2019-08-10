@@ -1,5 +1,6 @@
 ﻿using MLAgents;
 using System.Collections;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 
@@ -9,7 +10,6 @@ public class KatieSoccerAgent : Agent
     public KatieSoccerAgent opposingAgent;
     public GameObject[] TeamPieces;
     public GameObject[] OpposingPieces;
-    public GameObject[] Walls;
 
     /// <summary>
     /// The goal to push the block to.
@@ -23,16 +23,16 @@ public class KatieSoccerAgent : Agent
 
     public AIGoal goalDetect;
 
+    public RayPerception rayPerception;
+
     private Rigidbody[] teamRBs;
     public bool AllowShot = false;
 
-    private Collider[] walls;
-    private int numberOfWalls = 12;
-
     private GameObject[] allPieces;
     private int numberOfPieces = 3;
+    private float rayDistance = 12f;
+    private float[] rayAngles;
     private float goalReward = 100f;
-    private float minimumScoringDistance = 6f;
     private float minStrength = 0.9f;
     private float maxStrength = 5f;
     private float speed = 200f;
@@ -65,17 +65,16 @@ public class KatieSoccerAgent : Agent
 
         allPieces[i] = ball;
 
-        walls = new Collider[numberOfWalls];
+        var angles = from angle in Enumerable.Range(0, 360)
+                     where angle % 6 == 0
+                     select angle;
 
+        rayAngles = new float[angles.Count()];
         i = 0;
-        for (int j = 0; j < Walls.Length; j++)
+        foreach (int angle in angles)
         {
-            Collider[] colliders = Walls[j].GetComponents<Collider>();
-            for (int k = 0; k < colliders.Length; k++)
-            {
-                walls[i] = colliders[k];
-                i++;
-            }
+            rayAngles[i] = angle;
+            i++;
         }
     }
 
@@ -90,26 +89,17 @@ public class KatieSoccerAgent : Agent
 
     public override void CollectObservations()
     {
+        var detectableObjects = new[] { "Ball", "TeamOneGoal", "TeamTwoGoal", "Wall", "TeamOnePiece", "TeamTwoPiece" };
         for (int i = 0; i < numberOfPieces; i++)
         {
-            if (i == 0)
+            if (i < TeamPieces.Length)
             {
-                AddVectorObs(TeamPieces[i].transform.position);
+                AddVectorObs(rayPerception.Perceive(TeamPieces[i].transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
             }
             else
             {
-                AddVectorObs(Vector3.zero);
+                AddVectorObs(rayPerception.Perceive(transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
             }
-        }
-
-        for (int i = 0; i < numberOfPieces; i++)
-        {
-            AddVectorObs(Vector3.zero);
-        }
-
-        for (int i = 0; i < walls.Length; i++)
-        {
-            AddVectorObs(walls[i].transform.position);
         }
 
         AddVectorObs(ball.transform.position);
@@ -151,10 +141,7 @@ public class KatieSoccerAgent : Agent
             if (distanceToGoal < lastDistance)
             {
                 var score = (distanceToGoal * goalReward) + 1;
-                if (distanceToGoal <= minimumScoringDistance)
-                {
-                    AddReward(1 / score);
-                }
+				AddReward(1 / score);
             }
             
             lastDistance = distanceToGoal;

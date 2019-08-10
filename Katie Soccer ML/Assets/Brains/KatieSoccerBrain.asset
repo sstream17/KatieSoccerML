@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: KatieSoccerBrain
   m_EditorClassIdentifier: 
   brainParameters:
-    vectorObservationSize: 57
-    numStackedVectorObservations: 10
+    vectorObservationSize: 1443
+    numStackedVectorObservations: 12
     vectorActionSize: 03000000
     cameraResolutions: []
     vectorActionDescriptions:
