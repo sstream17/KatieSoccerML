@@ -42,8 +42,8 @@ public class KatieSoccerAgent : Agent
     private float MaxX = 4.25f;
     private float MinY = -3.9f;
     private float MaxY = 2.1f;
-    private float ballZ = -0.35f;
-    private float pieceZ = -0.3f;
+    private float ballZ = 1.65f;
+    private float pieceZ = 1.7f;
     private float fieldWidth = 11.95f;
     private float fieldHeight = 6.45f;
 
@@ -207,7 +207,8 @@ public class KatieSoccerAgent : Agent
     void ResetBall()
     {
         // Get a random position for the block.
-        ball.transform.position = GetRandomSpawnPos(ballZ);
+        float offset = transform.position.z + ballZ;
+        ball.transform.position = GetRandomSpawnPos(offset);
     }
 
 
@@ -223,7 +224,8 @@ public class KatieSoccerAgent : Agent
         {
             Rigidbody rb = piece.GetComponent<Rigidbody>();
             rb.velocity = Vector3.zero;
-            piece.transform.position = GetRandomSpawnPos(pieceZ);
+            float offset = transform.position.z + pieceZ;
+            piece.transform.position = GetRandomSpawnPos(offset);
             PieceMovement pieceMovement = piece.gameObject.GetComponent<PieceMovement>();
             pieceMovement.SetStartingPositions();
         }
