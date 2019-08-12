@@ -23,11 +23,15 @@ public class KatieSoccerAgent : Agent
 
     public AIGoal goalDetect;
 
+    public RayPerception rayPerception;
+
     private Rigidbody[] teamRBs;
     public bool AllowShot = false;
 
     private GameObject[] allPieces;
     private int numberOfPieces = 3;
+    private float rayDistance = 12f;
+    private float[] rayAngles;
     private float goalReward = 100f;
     private float minStrength = 0.9f;
     private float maxStrength = 5f;
@@ -62,6 +66,18 @@ public class KatieSoccerAgent : Agent
         }
 
         allPieces[i] = ball;
+
+        var angles = from angle in Enumerable.Range(0, 360)
+                     where angle % 6 == 0
+                     select angle;
+
+        rayAngles = new float[angles.Count()];
+        i = 0;
+        foreach (int angle in angles)
+        {
+            rayAngles[i] = angle;
+            i++;
+        }
     }
 
     void Update()
@@ -82,16 +98,16 @@ public class KatieSoccerAgent : Agent
 
     public override void CollectObservations()
     {
+        var detectableObjects = new[] { "Ball", "TeamOneGoal", "TeamTwoGoal", "Wall", "TeamOnePiece", "TeamTwoPiece" };
         for (int i = 0; i < numberOfPieces; i++)
         {
             if (i < TeamPieces.Length)
             {
-                var normalizedPosition = NormalizePosition(TeamPieces[i].transform.position);
-                AddVectorObs(normalizedPosition);
+                AddVectorObs(rayPerception.Perceive(TeamPieces[i].transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
             }
             else
             {
-                AddVectorObs(Vector2.zero);
+                AddVectorObs(rayPerception.Perceive(transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
             }
         }
 
@@ -99,17 +115,15 @@ public class KatieSoccerAgent : Agent
         {
             if (i < OpposingPieces.Length)
             {
-                var normalizedPosition = NormalizePosition(OpposingPieces[i].transform.position);
-                AddVectorObs(normalizedPosition);
+                AddVectorObs(rayPerception.Perceive(OpposingPieces[i].transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
             }
             else
             {
-                AddVectorObs(Vector2.zero);
+                AddVectorObs(rayPerception.Perceive(transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
             }
         }
 
-        var normalizedBallPosition = NormalizePosition(ball.transform.position);
-        AddVectorObs(normalizedBallPosition);
+        AddVectorObs(rayPerception.Perceive(ball.transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
     }
 
     public override void AgentAction(float[] vectorAction, string textAction)
