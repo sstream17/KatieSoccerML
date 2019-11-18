@@ -520,26 +520,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f70c576904c2b14fa0b4433703d134a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  broadcastHub:
-    broadcastingBrains:
-    - {fileID: 0}
-    _brainsToControl:
-    - {fileID: 0}
-  maxSteps: 7500
-  trainingConfiguration:
-    width: 480
-    height: 480
+  m_TrainingConfiguration:
+    width: 80
+    height: 80
     qualityLevel: 1
-    timeScale: 15
+    timeScale: 1
     targetFrameRate: -1
-  inferenceConfiguration:
+  m_InferenceConfiguration:
     width: 1280
     height: 720
     qualityLevel: 5
     timeScale: 1
     targetFrameRate: 60
   resetParameters:
-    resetParameters: []
+    m_ResetParameters: []
   spawnAreaMarginMultiplier: 0.8
   TimePenalty: 500
 --- !u!4 &1479792065

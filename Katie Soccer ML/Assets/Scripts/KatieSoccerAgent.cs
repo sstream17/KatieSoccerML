@@ -89,13 +89,6 @@ public class KatieSoccerAgent : Agent
         }
     }
 
-    private Vector2 NormalizePosition(Vector2 position)
-    {
-        float normalX = position.x / fieldWidth + 0.5f;
-        float normalY = position.y / fieldHeight + 55f / 86f;
-        return new Vector2(normalX, normalY);
-    }
-
     public override void CollectObservations()
     {
         var detectableObjects = new[] { "Ball", "TeamOneGoal", "TeamTwoGoal", "Wall", "TeamOnePiece", "TeamTwoPiece" };
@@ -123,7 +116,7 @@ public class KatieSoccerAgent : Agent
             }
         }
 
-        AddVectorObs(rayPerception.Perceive(ball.transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
+        AddVectorObs(rayPerception.Perceive(ball.transform, rayDistance, rayAngles, detectableObjects, 0f, -0.1f));
     }
 
     public override void AgentAction(float[] vectorAction, string textAction)
