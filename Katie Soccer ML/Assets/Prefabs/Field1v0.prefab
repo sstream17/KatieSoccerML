@@ -10,7 +10,8 @@ GameObject:
   m_Component:
   - component: {fileID: 4085635250268635486}
   - component: {fileID: 4085635250268635456}
-  - component: {fileID: 4085635250268635457}
+  - component: {fileID: 7245327451658883295}
+  - component: {fileID: 4535307480384279131}
   m_Layer: 0
   m_Name: TeamTwoPieces
   m_TagString: Untagged
@@ -45,10 +46,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: afebe307ae2339946966dcf610e83ca0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  brain: {fileID: 11400000, guid: 89f2e4c12fbc76c468be73537b27d9af, type: 2}
   agentParameters:
-    agentCameras: []
-    agentRenderTextures: []
     maxStep: 0
     resetOnDone: 1
     onDemandDecision: 1
@@ -61,11 +59,11 @@ MonoBehaviour:
   goal: {fileID: 4085635251722335933}
   ball: {fileID: 4085635251673199786}
   goalDetect: {fileID: 4085635251722335934}
-  rayPerception: {fileID: 4085635250268635457}
+  rayPerception: {fileID: 7245327451658883295}
   AllowShot: 0
   OffsetX: 0
   OffsetY: 0
---- !u!114 &4085635250268635457
+--- !u!114 &7245327451658883295
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -74,9 +72,31 @@ MonoBehaviour:
   m_GameObject: {fileID: 4085635250268635487}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bb172294dbbcc408286b156a2c4b553c, type: 3}
+  m_Script: {fileID: 11500000, guid: 3977634df39f848309a1468453f63ae7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &4535307480384279131
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4085635250268635487}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d1c4e0b1822b495aa52bc52839ecb30, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_BrainParameters:
+    vectorObservationSize: 3360
+    numStackedVectorObservations: 12
+    vectorActionSize: 03000000
+    vectorActionDescriptions: []
+    vectorActionSpaceType: 1
+  m_Model: {fileID: 0}
+  m_InferenceDevice: 0
+  m_UseHeuristic: 0
+  m_BehaviorName: KatieSoccer
 --- !u!1 &4085635250431279590
 GameObject:
   m_ObjectHideFlags: 0
@@ -252,18 +272,6 @@ MonoBehaviour:
   Ball: {fileID: 4085635251673199786}
   TeamOneAgent: {fileID: 0}
   TeamTwoAgent: {fileID: 4085635250268635456}
---- !u!114 &4085635250359683442
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4403774895921024700}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: adceb9583f6742f4685ec14d67f6153a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &4085635251488157880
 GameObject:
   m_ObjectHideFlags: 0
@@ -812,6 +820,18 @@ BoxCollider:
   serializedVersion: 2
   m_Size: {x: 1.5, y: 1, z: 0.25}
   m_Center: {x: 0.625, y: 0, z: 1.375}
+--- !u!114 &4085635250359683442
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4403774895921024700}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: adceb9583f6742f4685ec14d67f6153a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &4085635250359683441
 PrefabInstance:
   m_ObjectHideFlags: 0

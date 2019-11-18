@@ -1,14 +1,14 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using Google.Protobuf;
-using MLAgents.CommunicatorObjects;
+using System.Collections.Generic;
 using UnityEngine;
+using Barracuda;
+using MLAgents.Sensor;
+
 
 
 namespace MLAgents
 {
     /// <summary>
-    /// Struct that contains all the information for an Agent, including its 
+    /// Struct that contains all the information for an Agent, including its
     /// observations, actions and current status, that is sent to the Brain.
     /// </summary>
     public struct AgentInfo
@@ -26,9 +26,9 @@ namespace MLAgents
         public List<float> stackedVectorObservation;
 
         /// <summary>
-        /// Most recent agent camera (i.e. texture) observation.
+        /// Most recent compressed observations.
         /// </summary>
-        public List<Texture2D> visualObservations;
+        public List<CompressedObservation> compressedObservations;
 
         /// <summary>
         /// Most recent text observation.
@@ -83,51 +83,13 @@ namespace MLAgents
         /// <summary>
         /// User-customizable object for sending structured output from Unity to Python in response
         /// to an action in addition to a scalar reward.
+        /// TODO(cgoy): All references to protobuf objects should be removed.
         /// </summary>
-        public CustomObservation customObservation;
-
-        /// <summary>
-        /// Converts a AgentInfo to a protobuffer generated AgentInfoProto
-        /// </summary>
-        /// <returns>The protobuf verison of the AgentInfo.</returns>
-        /// <param name="info">The AgentInfo to convert.</param>
-        public CommunicatorObjects.AgentInfoProto ToProto()
-        {
-            var agentInfoProto = new CommunicatorObjects.AgentInfoProto
-            {
-                StackedVectorObservation = {stackedVectorObservation},
-                StoredVectorActions = {storedVectorActions},
-                StoredTextActions = storedTextActions,
-                TextObservation = textObservation,
-                Reward = reward,
-                MaxStepReached = maxStepReached,
-                Done = done,
-                Id = id,
-                CustomObservation = customObservation
-            };
-            if (memories != null)
-            {
-                agentInfoProto.Memories.Add(memories);
-            }
-
-            if (actionMasks != null)
-            {
-                agentInfoProto.ActionMask.AddRange(actionMasks);
-            }
-
-            foreach (Texture2D obs in visualObservations)
-            {
-                agentInfoProto.VisualObservations.Add(
-                    ByteString.CopyFrom(obs.EncodeToPNG())
-                );
-            }
-
-            return agentInfoProto;
-        }
+        public CommunicatorObjects.CustomObservationProto customObservation;
     }
 
     /// <summary>
-    /// Struct that contains the action information sent from the Brain to the 
+    /// Struct that contains the action information sent from the Brain to the
     /// Agent.
     /// </summary>
     public struct AgentAction
@@ -136,11 +98,12 @@ namespace MLAgents
         public string textActions;
         public List<float> memories;
         public float value;
-        public CommunicatorObjects.CustomAction customAction;
+        /// TODO(cgoy): All references to protobuf objects should be removed.
+        public CommunicatorObjects.CustomActionProto customAction;
     }
 
     /// <summary>
-    /// Struct that contains all the Agent-specific parameters provided in the 
+    /// Struct that contains all the Agent-specific parameters provided in the
     /// Editor. This excludes the Brain linked to the Agent since it can be
     /// modified programmatically.
     /// </summary>
@@ -148,20 +111,7 @@ namespace MLAgents
     public class AgentParameters
     {
         /// <summary>
-        /// The list of the Camera GameObjects the agent uses for visual
-        /// observations.
-        /// </summary>
-        public List<Camera> agentCameras = new List<Camera>();
-        
-        /// <summary>
-        /// The list of the RenderTextures the agent uses for visual
-        /// observations.
-        /// </summary>
-        public List<RenderTexture> agentRenderTextures = new List<RenderTexture>();
-
-
-        /// <summary>
-        /// The maximum number of steps the agent takes before being done. 
+        /// The maximum number of steps the agent takes before being done.
         /// </summary>
         /// <remarks>
         /// If set to 0, the agent can only be set to done programmatically (or
@@ -183,7 +133,7 @@ namespace MLAgents
         public bool resetOnDone = true;
 
         /// <summary>
-        /// Whether to enable On Demand Decisions or make a decision at 
+        /// Whether to enable On Demand Decisions or make a decision at
         /// every step.
         /// </summary>
         public bool onDemandDecision;
@@ -198,37 +148,35 @@ namespace MLAgents
 
     /// <summary>
     /// Agent Monobehavior class that is attached to a Unity GameObject, making it
-    /// an Agent. An agent produces observations and takes actions in the 
-    /// environment. Observations are determined by the cameras attached 
+    /// an Agent. An agent produces observations and takes actions in the
+    /// environment. Observations are determined by the cameras attached
     /// to the agent in addition to the vector observations implemented by the
     /// user in <see cref="CollectObservations"/>. On the other hand, actions
-    /// are determined by decisions produced by a linked Brain. Currently, this
+    /// are determined by decisions produced by a Policy. Currently, this
     /// class is expected to be extended to implement the desired agent behavior.
     /// </summary>
     /// <remarks>
     /// Simply speaking, an agent roams through an environment and at each step
     /// of the environment extracts its current observation, sends them to its
-    /// linked brain and in return receives an action from its brain. In practice,
+    /// policy and in return receives an action. In practice,
     /// however, an agent need not send its observation at every step since very
-    /// little may have changed between sucessive steps. Currently, how often an
-    /// agent updates its brain with a fresh observation is determined by the
-    /// Academy. 
-    /// 
-    /// At any step, an agent may be considered <see cref="done"/>. 
+    /// little may have changed between successive steps.
+    ///
+    /// At any step, an agent may be considered <see cref="m_Done"/>.
     /// This could occur due to a variety of reasons:
     ///     - The agent reached an end state within its environment.
     ///     - The agent reached the maximum # of steps (i.e. timed out).
     ///     - The academy reached the maximum # of steps (forced agent to be done).
-    /// 
+    ///
     /// Here, an agent reaches an end state if it completes its task successfully
     /// or somehow fails along the way. In the case where an agent is done before
     /// the academy, it either resets and restarts, or just lingers until the
     /// academy is done.
-    /// 
+    ///
     /// An important note regarding steps and episodes is due. Here, an agent step
     /// corresponds to an academy step, which also corresponds to Unity
     /// environment step (i.e. each FixedUpdate call). This is not the case for
-    /// episodes. The academy controls the global episode count and each agent 
+    /// episodes. The academy controls the global episode count and each agent
     /// controls its own local episode count and can reset and start a new local
     /// episode independently (based on its own experience). Thus an academy
     /// (global) episode can be viewed as the upper-bound on an agents episode
@@ -236,26 +184,22 @@ namespace MLAgents
     /// multiple local episodes. Consequently, if an agent max step is
     /// set to a value larger than the academy max steps value, then the academy
     /// value takes precedence (since the agent max step will never be reached).
-    /// 
-    /// Lastly, note that at any step the brain linked to the agent is allowed to
-    /// change programmatically with <see cref="GiveBrain"/>.
-    /// 
+    ///
+    /// Lastly, note that at any step the policy to the agent is allowed to
+    /// change model with <see cref="GiveModel"/>.
+    ///
     /// Implementation-wise, it is required that this class is extended and the
     /// virtual methods overridden. For sample implementations of agent behavior,
     /// see the Examples/ directory within this Unity project.
     /// </remarks>
     [HelpURL("https://github.com/Unity-Technologies/ml-agents/blob/master/" +
-             "docs/Learning-Environment-Design-Agents.md")]
+        "docs/Learning-Environment-Design-Agents.md")]
     [System.Serializable]
+    [RequireComponent(typeof(BehaviorParameters))]
     public abstract class Agent : MonoBehaviour
     {
-        /// <summary>
-        /// The Brain attached to this agent. A brain can be attached either
-        /// directly from the Editor through AgentEditor or 
-        /// programmatically through <see cref="GiveBrain"/>. It is OK for an agent
-        /// to not have a brain, as long as no decision is requested.
-        /// </summary>
-        [HideInInspector] public Brain brain;
+        private IPolicy m_Brain;
+        private BehaviorParameters m_PolicyFactory;
 
         /// <summary>
         /// Agent parameters specified within the Editor via AgentEditor.
@@ -263,10 +207,15 @@ namespace MLAgents
         [HideInInspector] public AgentParameters agentParameters;
 
         /// Current Agent information (message sent to Brain).
-        AgentInfo info;
+        AgentInfo m_Info;
+        public AgentInfo Info
+        {
+            get { return m_Info; }
+            set { m_Info = value; }
+        }
 
         /// Current Agent action (message sent from Brain).
-        AgentAction action;
+        AgentAction m_Action;
 
         /// Represents the reward the agent accumulated during the current step.
         /// It is reset to 0 at the beginning of every step.
@@ -274,79 +223,72 @@ namespace MLAgents
         /// action that we wish to reinforce/reward, and set to a negative value
         /// when the agent performs a "bad" action that we wish to punish/deter.
         /// Additionally, the magnitude of the reward should not exceed 1.0
-        float reward;
+        float m_Reward;
 
         /// Keeps track of the cumulative reward in this episode.
-        float cumulativeReward;
+        float m_CumulativeReward;
 
         /// Whether or not the agent requests an action.
-        bool requestAction;
+        bool m_RequestAction;
 
         /// Whether or not the agent requests a decision.
-        bool requestDecision;
+        bool m_RequestDecision;
 
         /// Whether or not the agent has completed the episode. This may be due
         /// to either reaching a success or fail state, or reaching the maximum
         /// number of steps (i.e. timing out).
-        bool done;
+        bool m_Done;
 
         /// Whether or not the agent reached the maximum number of steps.
-        bool maxStepReached;
+        bool m_MaxStepReached;
 
         /// Keeps track of the number of steps taken by the agent in this episode.
         /// Note that this value is different for each agent, and may not overlap
         /// with the step counter in the Academy, since agents reset based on
         /// their own experience.
-        int stepCount;
+        int m_StepCount;
 
         /// Flag to signify that an agent has been reset but the fact that it is
         /// done has not been communicated (required for On Demand Decisions).
-        bool hasAlreadyReset;
+        bool m_HasAlreadyReset;
 
         /// Flag to signify that an agent is done and should not reset until
         /// the fact that it is done has been communicated.
-        bool terminate;
+        bool m_Terminate;
 
         /// Unique identifier each agent receives at initialization. It is used
         /// to separate between different agents in the environment.
-        int id;
+        int m_Id;
 
         /// Keeps track of the actions that are masked at each step.
-        private ActionMasker actionMasker;
-
-        /// Array of Texture2D used to render to from render buffer before  
-        /// transforming into float tensor.
-        Texture2D[] textureArray;
+        private ActionMasker m_ActionMasker;
 
         /// <summary>
         /// Demonstration recorder.
         /// </summary>
-        private DemonstrationRecorder recorder;
+        private DemonstrationRecorder m_Recorder;
+
+        public List<ISensor> m_Sensors;
 
         /// Monobehavior function that is called when the attached GameObject
         /// becomes enabled or active.
         void OnEnable()
         {
-            var textureCount = agentParameters.agentCameras.Count+agentParameters.agentRenderTextures.Count;
-            textureArray = new Texture2D[textureCount];
-            for (int i = 0; i < textureCount; i++)
-            {
-                textureArray[i] = new Texture2D(1, 1, TextureFormat.RGB24, false);
-            }
-
-            id = gameObject.GetInstanceID();
-            Academy academy = Object.FindObjectOfType<Academy>() as Academy;
+            m_Id = gameObject.GetInstanceID();
+            var academy = FindObjectOfType<Academy>();
+            academy.LazyInitialization();
             OnEnableHelper(academy);
 
-            recorder = GetComponent<DemonstrationRecorder>();
+            m_Recorder = GetComponent<DemonstrationRecorder>();
         }
 
         /// Helper method for the <see cref="OnEnable"/> event, created to
         /// facilitate testing.
         void OnEnableHelper(Academy academy)
         {
-            info = new AgentInfo();
-            action = new AgentAction();
+            m_Info = new AgentInfo();
+            m_Action = new AgentAction();
+            m_Sensors = new List<ISensor>();
 
             if (academy == null)
             {
@@ -357,57 +299,53 @@ namespace MLAgents
             academy.AgentSetStatus += SetStatus;
             academy.AgentResetIfDone += ResetIfDone;
             academy.AgentSendState += SendInfo;
+            academy.DecideAction += DecideAction;
             academy.AgentAct += AgentStep;
             academy.AgentForceReset += _AgentReset;
-
-            if (brain != null)
-            {
-                ResetData();
-            }
-            else
-            {
-                Debug.Log(
-                    string.Format(
-                        "The Agent component attached to the " +
-                        "GameObject {0} was initialized without a brain.",
-                        gameObject.name));
-            }
-
+            m_PolicyFactory = GetComponent<BehaviorParameters>();
+            m_Brain = m_PolicyFactory.GeneratePolicy(Heuristic);
+            ResetData();
             InitializeAgent();
+            InitializeSensors();
         }
 
         /// Monobehavior function that is called when the attached GameObject
         /// becomes disabled or inactive.
         void OnDisable()
         {
-            Academy academy = Object.FindObjectOfType<Academy>() as Academy;
+            var academy = FindObjectOfType<Academy>();
             if (academy != null)
             {
                 academy.AgentSetStatus -= SetStatus;
                 academy.AgentResetIfDone -= ResetIfDone;
                 academy.AgentSendState -= SendInfo;
+                academy.DecideAction -= DecideAction;
                 academy.AgentAct -= AgentStep;
-                academy.AgentForceReset -= _AgentReset;
+                academy.AgentForceReset -= ForceReset;
             }
+            m_Brain?.Dispose();
         }
 
         /// <summary>
-        /// Updates the Brain for the agent. Any brain currently assigned to the
-        /// agent will be replaced with the provided one.
+        /// Updates the Model for the agent. Any model currently assigned to the
+        /// agent will be replaced with the provided one. If the arguments are
+        /// identical to the current parameters of the agent, the model will
+        /// remain unchanged.
         /// </summary>
-        /// <remarks>
-        /// The agent unsubscribes from its current brain (if it has one) and
-        /// subscribes to the provided brain. This enables contextual brains, that
-        /// is, updating the behaviour (hence brain) of the agent depending on
-        /// the context of the game. For example, we may utilize one (wandering)
-        /// brain when an agent is randomly exploring an open world, but switch
-        /// to another (fighting) brain when it comes into contact with an enemy.
-        /// </remarks>
-        /// <param name="brain">New brain to subscribe this agent to</param>
-        public void GiveBrain(Brain brain)
+        /// <param name="behaviorName"> The identifier of the behavior. This
+        /// will categorize the agent when training.
+        /// </param>
+        /// <param name="model"> The model to use for inference.</param>
+        /// <param name = "inferenceDevide"> Define on what device the model
+        /// will be run.</param>
+        public void GiveModel(
+            string behaviorName,
+            NNModel model,
+            InferenceDevice inferenceDevice = InferenceDevice.CPU)
         {
-            this.brain = brain;
-            ResetData();
+            m_PolicyFactory.GiveModel(behaviorName, model, inferenceDevice);
+            m_Brain?.Dispose();
+            m_Brain = m_PolicyFactory.GeneratePolicy(Heuristic);
         }
 
         /// <summary>
@@ -418,7 +356,7 @@ namespace MLAgents
         /// </returns>
         public int GetStepCount()
         {
-            return stepCount;
+            return m_StepCount;
         }
 
         /// <summary>
@@ -426,10 +364,10 @@ namespace MLAgents
         /// </summary>
         public void ResetReward()
         {
-            reward = 0f;
-            if (done)
+            m_Reward = 0f;
+            if (m_Done)
             {
-                cumulativeReward = 0f;
+                m_CumulativeReward = 0f;
             }
         }
 
@@ -440,8 +378,8 @@ namespace MLAgents
         /// <param name="reward">The new value of the reward.</param>
         public void SetReward(float reward)
         {
-            cumulativeReward += (reward - this.reward);
-            this.reward = reward;
+            m_CumulativeReward += (reward - m_Reward);
+            m_Reward = reward;
         }
 
         /// <summary>
@@ -450,8 +388,8 @@ namespace MLAgents
         /// <param name="increment">Incremental reward value.</param>
         public void AddReward(float increment)
         {
-            reward += increment;
-            cumulativeReward += increment;
+            m_Reward += increment;
+            m_CumulativeReward += increment;
         }
 
         /// <summary>
@@ -460,7 +398,7 @@ namespace MLAgents
         /// <returns>The step reward.</returns>
         public float GetReward()
         {
-            return reward;
+            return m_Reward;
         }
 
         /// <summary>
@@ -469,7 +407,7 @@ namespace MLAgents
         /// <returns>The episode reward.</returns>
         public float GetCumulativeReward()
         {
-            return cumulativeReward;
+            return m_CumulativeReward;
         }
 
         /// <summary>
@@ -477,7 +415,7 @@ namespace MLAgents
         /// </summary>
         public void Done()
         {
-            done = true;
+            m_Done = true;
         }
 
         /// <summary>
@@ -485,7 +423,7 @@ namespace MLAgents
         /// </summary>
         public void RequestDecision()
         {
-            requestDecision = true;
+            m_RequestDecision = true;
             RequestAction();
         }
 
@@ -494,7 +432,7 @@ namespace MLAgents
         /// </summary>
         public void RequestAction()
         {
-            requestAction = true;
+            m_RequestAction = true;
         }
 
         /// <summary>
@@ -505,7 +443,7 @@ namespace MLAgents
         /// </returns>
         public bool IsMaxStepReached()
         {
-            return maxStepReached;
+            return m_MaxStepReached;
         }
 
         /// <summary>
@@ -516,7 +454,7 @@ namespace MLAgents
         /// </returns>
         public bool IsDone()
         {
-            return done;
+            return m_Done;
         }
 
         /// Helper function that resets all the data structures associated with
@@ -524,46 +462,41 @@ namespace MLAgents
         /// at the end of an episode.
         void ResetData()
         {
-            if (brain == null)
-            {
-                return;
-            }
-
-            BrainParameters param = brain.brainParameters;
-            actionMasker = new ActionMasker(param);
+            var param = m_PolicyFactory.brainParameters;
+            m_ActionMasker = new ActionMasker(param);
             // If we haven't initialized vectorActions, initialize to 0. This should only
             // happen during the creation of the Agent. In subsequent episodes, vectorAction
-            // should stay the previous action before the Done(), so that it is properly recorded. 
-            if (action.vectorActions == null)
+            // should stay the previous action before the Done(), so that it is properly recorded.
+            if (m_Action.vectorActions == null)
             {
-                if (param.vectorActionSpaceType == SpaceType.continuous)
+                if (param.vectorActionSpaceType == SpaceType.Continuous)
                 {
-                    action.vectorActions = new float[param.vectorActionSize[0]];
-                    info.storedVectorActions = new float[param.vectorActionSize[0]];
+                    m_Action.vectorActions = new float[param.vectorActionSize[0]];
+                    m_Info.storedVectorActions = new float[param.vectorActionSize[0]];
                 }
                 else
                 {
-                    action.vectorActions = new float[param.vectorActionSize.Length];
-                    info.storedVectorActions = new float[param.vectorActionSize.Length];
+                    m_Action.vectorActions = new float[param.vectorActionSize.Length];
+                    m_Info.storedVectorActions = new float[param.vectorActionSize.Length];
                 }
             }
 
-            if (info.textObservation == null)
-                info.textObservation = "";
-            action.textActions = "";
-            info.memories = new List<float>();
-            action.memories = new List<float>();
-            info.vectorObservation =
+            if (m_Info.textObservation == null)
+                m_Info.textObservation = "";
+            m_Action.textActions = "";
+            m_Info.memories = new List<float>();
+            m_Action.memories = new List<float>();
+            m_Info.vectorObservation =
                 new List<float>(param.vectorObservationSize);
-            info.stackedVectorObservation =
+            m_Info.stackedVectorObservation =
                 new List<float>(param.vectorObservationSize
-                                * brain.brainParameters.numStackedVectorObservations);
-            info.stackedVectorObservation.AddRange(
+                    * param.numStackedVectorObservations);
+            m_Info.stackedVectorObservation.AddRange(
                 new float[param.vectorObservationSize
                           * param.numStackedVectorObservations]);
 
-            info.visualObservations = new List<Texture2D>();
-            info.customObservation = null;
+            m_Info.compressedObservations = new List<CompressedObservation>();
+            m_Info.customObservation = null;
         }
 
         /// <summary>
@@ -579,99 +512,139 @@ namespace MLAgents
         {
         }
 
+
+        /// <summary>
+        /// When the Agent uses Heuristics, it will call this method every time it
+        /// needs an action. This can be used for debugging or controlling the agent
+        /// with keyboard.
+        /// </summary>
+        /// <returns> A float array corresponding to the next action of the Agent
+        /// </returns>
+        public virtual float[] Heuristic()
+        {
+            throw new UnityAgentsException(string.Format(
+                    "The Heuristic method was not implemented for the Agent on the " +
+                    "{0} GameObject.",
+                    gameObject.name));
+        }
+
+        /// <summary>
+        /// Set up the list of ISensors on the Agent. By default, this will select any
+        /// SensorBase's attached to the Agent.
+        /// </summary>
+        public void InitializeSensors()
+        {
+            var attachedSensorComponents = GetComponents<SensorComponent>();
+            m_Sensors.Capacity += attachedSensorComponents.Length;
+            foreach (var component in attachedSensorComponents)
+            {
+                m_Sensors.Add(component.CreateSensor());
+            }
+
+            // Sort the sensors by name to ensure determinism
+            m_Sensors.Sort((x, y) => x.GetName().CompareTo(y.GetName()));
+
+#if DEBUG
+            // Make sure the names are actually unique
+            for (var i = 0; i < m_Sensors.Count - 1; i++)
+            {
+                Debug.Assert(!m_Sensors[i].GetName().Equals(m_Sensors[i + 1].GetName()), "Sensor names must be unique.");
+            }
+#endif
+        }
+
         /// <summary>
         /// Sends the Agent info to the linked Brain.
         /// </summary>
         void SendInfoToBrain()
         {
-            if (brain == null)
+            if (m_Brain == null)
             {
                 return;
             }
 
-            info.memories = action.memories;
-            info.storedVectorActions = action.vectorActions;
-            info.storedTextActions = action.textActions;
-            info.vectorObservation.Clear();
-            actionMasker.ResetMask();
-            CollectObservations();
-            info.actionMasks = actionMasker.GetMask();
+            m_Info.memories = m_Action.memories;
+            m_Info.storedVectorActions = m_Action.vectorActions;
+            m_Info.storedTextActions = m_Action.textActions;
+            m_Info.vectorObservation.Clear();
+            m_Info.compressedObservations.Clear();
+            m_ActionMasker.ResetMask();
+            using (TimerStack.Instance.Scoped("CollectObservations"))
+            {
+                CollectObservations();
+            }
+            m_Info.actionMasks = m_ActionMasker.GetMask();
 
-            BrainParameters param = brain.brainParameters;
-            if (info.vectorObservation.Count != param.vectorObservationSize)
+            var param = m_PolicyFactory.brainParameters;
+            if (m_Info.vectorObservation.Count != param.vectorObservationSize)
             {
                 throw new UnityAgentsException(string.Format(
-                    "Vector Observation size mismatch between continuous " +
-                    "agent {0} and brain {1}. " +
-                    "Was Expecting {2} but received {3}. ",
-                    gameObject.name, brain.name,
-                    brain.brainParameters.vectorObservationSize,
-                    info.vectorObservation.Count));
+                    "Vector Observation size mismatch in continuous " +
+                    "agent {0}. " +
+                    "Was Expecting {1} but received {2}. ",
+                    gameObject.name,
+                    param.vectorObservationSize,
+                    m_Info.vectorObservation.Count));
             }
 
-            info.stackedVectorObservation.RemoveRange(
-                0, param.vectorObservationSize);
-            info.stackedVectorObservation.AddRange(info.vectorObservation);
+            Utilities.ShiftLeft(m_Info.stackedVectorObservation, param.vectorObservationSize);
+            Utilities.ReplaceRange(m_Info.stackedVectorObservation, m_Info.vectorObservation,
+                m_Info.stackedVectorObservation.Count - m_Info.vectorObservation.Count);
 
-            info.visualObservations.Clear();
-            var visualObservationCount = agentParameters.agentCameras.Count+agentParameters.agentRenderTextures.Count;
-            if (param.cameraResolutions.Length > visualObservationCount)
+            m_Info.reward = m_Reward;
+            m_Info.done = m_Done;
+            m_Info.maxStepReached = m_MaxStepReached;
+            m_Info.id = m_Id;
+
+            m_Brain.RequestDecision(this);
+
+            if (m_Recorder != null && m_Recorder.record && Application.isEditor)
             {
-                throw new UnityAgentsException(string.Format(
-                    "Not enough cameras/renderTextures for agent {0} : Brain {1} expecting at " +
-                    "least {2} cameras/renderTextures but only {3} were present.",
-                    gameObject.name, brain.name,
-                    brain.brainParameters.cameraResolutions.Length,
-                    visualObservationCount));
+                // This is a bit of a hack - if we're in inference mode, compressed observations won't be generated
+                // But we need these to be generated for the recorder. So generate them here.
+                if (m_Info.compressedObservations.Count == 0)
+                {
+                    GenerateSensorData();
+                }
+
+                m_Recorder.WriteExperience(m_Info);
             }
 
-            //First add all cameras
-            for (int i = 0; i < agentParameters.agentCameras.Count; i++)
+            m_Info.textObservation = "";
+        }
+
+        /// <summary>
+        /// Generate data for each sensor and store it on the Agent's AgentInfo.
+        /// NOTE: At the moment, this is only called during training or when using a DemonstrationRecorder;
+        /// during inference the sensors are used to write directly to the Tensor data. This will likely change in the
+        /// future to be controlled by the type of brain being used.
+        /// </summary>
+        public void GenerateSensorData()
+        {
+            // Generate data for all sensors
+            // TODO add bool argument indicating when to compress? For now, we always will compress.
+            for (var i = 0; i < m_Sensors.Count; i++)
             {
-                ObservationToTexture(
-                    agentParameters.agentCameras[i],
-                    param.cameraResolutions[i].width,
-                    param.cameraResolutions[i].height,
-                    ref textureArray[i]);
-                info.visualObservations.Add(textureArray[i]);
+                var sensor = m_Sensors[i];
+                var compressedObs = new CompressedObservation
+                {
+                    Data = sensor.GetCompressedObservation(),
+                    Shape = sensor.GetFloatObservationShape(),
+                    CompressionType = sensor.GetCompressionType()
+                };
+                m_Info.compressedObservations.Add(compressedObs);
             }
-            
-            //Then add all renderTextures
-            var camCount = agentParameters.agentCameras.Count;
-            for (int i = 0; i < agentParameters.agentRenderTextures.Count; i++)
-            {
-                ObservationToTexture(
-                    agentParameters.agentRenderTextures[i],
-                    param.cameraResolutions[camCount+i].width,
-                    param.cameraResolutions[camCount+i].height,
-                    ref textureArray[i]);
-                info.visualObservations.Add(textureArray[i]);
-            }
-
-            info.reward = reward;
-            info.done = done;
-            info.maxStepReached = maxStepReached;
-            info.id = id;
-
-            brain.SendState(this, info);
-
-            if (recorder != null && recorder.record && Application.isEditor)
-            {
-                recorder.WriteExperience(info);
-            }
-
-            info.textObservation = "";
         }
 
         /// <summary>
         /// Collects the (vector, visual, text) observations of the agent.
-        /// The agent observation describes the current environment from the 
+        /// The agent observation describes the current environment from the
         /// perspective of the agent.
         /// </summary>
         /// <remarks>
         /// Simply, an agents observation is any environment information that helps
         /// the Agent acheive its goal. For example, for a fighting Agent, its
-        /// observation could include distances to friends or enemies, or the 
+        /// observation could include distances to friends or enemies, or the
         /// current level of ammunition at its disposal.
         /// Recall that an Agent may attach vector, visual or textual observations.
         /// Vector observations are added by calling the provided helper methods:
@@ -679,8 +652,12 @@ namespace MLAgents
         ///     - <see cref="AddVectorObs(float)"/>
         ///     - <see cref="AddVectorObs(Vector3)"/>
         ///     - <see cref="AddVectorObs(Vector2)"/>
-        ///     - <see cref="AddVectorObs(float[])"/>
-        ///     - <see cref="AddVectorObs(List{float})"/>
+        ///     - <see>
+        ///         <cref>AddVectorObs(float[])</cref>
+        ///       </see>
+        ///     - <see>
+        ///         <cref>AddVectorObs(List{float})</cref>
+        ///      </see>
         ///     - <see cref="AddVectorObs(Quaternion)"/>
         ///     - <see cref="AddVectorObs(bool)"/>
         ///     - <see cref="AddVectorObs(int, int)"/>
@@ -690,7 +667,7 @@ namespace MLAgents
         /// needs to match the vectorObservationSize attribute of the linked Brain.
         /// Visual observations are implicitly added from the cameras attached to
         /// the Agent.
-        /// Lastly, textual observations are added using 
+        /// Lastly, textual observations are added using
         /// <see cref="SetTextObs(string)"/>.
         /// </remarks>
         public virtual void CollectObservations()
@@ -706,7 +683,7 @@ namespace MLAgents
         /// <param name="actionIndices">The indices of the masked actions on branch 0</param>
         protected void SetActionMask(IEnumerable<int> actionIndices)
         {
-            actionMasker.SetActionMask(0, actionIndices);
+            m_ActionMasker.SetActionMask(0, actionIndices);
         }
 
         /// <summary>
@@ -718,7 +695,7 @@ namespace MLAgents
         /// <param name="actionIndex">The index of the masked action on branch 0</param>
         protected void SetActionMask(int actionIndex)
         {
-            actionMasker.SetActionMask(0, new int[1] { actionIndex });
+            m_ActionMasker.SetActionMask(0, new[] { actionIndex });
         }
 
         /// <summary>
@@ -731,7 +708,7 @@ namespace MLAgents
         /// <param name="actionIndex">The index of the masked action</param>
         protected void SetActionMask(int branch, int actionIndex)
         {
-            actionMasker.SetActionMask(branch, new int[1] { actionIndex });
+            m_ActionMasker.SetActionMask(branch, new[] { actionIndex });
         }
 
         /// <summary>
@@ -744,9 +721,8 @@ namespace MLAgents
         /// <param name="actionIndices">The indices of the masked actions</param>
         protected void SetActionMask(int branch, IEnumerable<int> actionIndices)
         {
-            actionMasker.SetActionMask(branch, actionIndices);
+            m_ActionMasker.SetActionMask(branch, actionIndices);
         }
-
 
         /// <summary>
         /// Adds a float observation to the vector observations of the agent.
@@ -755,7 +731,7 @@ namespace MLAgents
         /// <param name="observation">Observation.</param>
         protected void AddVectorObs(float observation)
         {
-            info.vectorObservation.Add(observation);
+            m_Info.vectorObservation.Add(observation);
         }
 
         /// <summary>
@@ -765,7 +741,7 @@ namespace MLAgents
         /// <param name="observation">Observation.</param>
         protected void AddVectorObs(int observation)
         {
-            info.vectorObservation.Add(observation);
+            m_Info.vectorObservation.Add(observation);
         }
 
         /// <summary>
@@ -775,9 +751,9 @@ namespace MLAgents
         /// <param name="observation">Observation.</param>
         protected void AddVectorObs(Vector3 observation)
         {
-            info.vectorObservation.Add(observation.x);
-            info.vectorObservation.Add(observation.y);
-            info.vectorObservation.Add(observation.z);
+            m_Info.vectorObservation.Add(observation.x);
+            m_Info.vectorObservation.Add(observation.y);
+            m_Info.vectorObservation.Add(observation.z);
         }
 
         /// <summary>
@@ -787,8 +763,8 @@ namespace MLAgents
         /// <param name="observation">Observation.</param>
         protected void AddVectorObs(Vector2 observation)
         {
-            info.vectorObservation.Add(observation.x);
-            info.vectorObservation.Add(observation.y);
+            m_Info.vectorObservation.Add(observation.x);
+            m_Info.vectorObservation.Add(observation.y);
         }
 
         /// <summary>
@@ -798,7 +774,7 @@ namespace MLAgents
         /// <param name="observation">Observation.</param>
         protected void AddVectorObs(IEnumerable<float> observation)
         {
-            info.vectorObservation.AddRange(observation);
+            m_Info.vectorObservation.AddRange(observation);
         }
 
         /// <summary>
@@ -808,10 +784,10 @@ namespace MLAgents
         /// <param name="observation">Observation.</param>
         protected void AddVectorObs(Quaternion observation)
         {
-            info.vectorObservation.Add(observation.x);
-            info.vectorObservation.Add(observation.y);
-            info.vectorObservation.Add(observation.z);
-            info.vectorObservation.Add(observation.w);
+            m_Info.vectorObservation.Add(observation.x);
+            m_Info.vectorObservation.Add(observation.y);
+            m_Info.vectorObservation.Add(observation.z);
+            m_Info.vectorObservation.Add(observation.w);
         }
 
         /// <summary>
@@ -821,14 +797,14 @@ namespace MLAgents
         /// <param name="observation"></param>
         protected void AddVectorObs(bool observation)
         {
-            info.vectorObservation.Add(observation ? 1f : 0f);
+            m_Info.vectorObservation.Add(observation ? 1f : 0f);
         }
 
         protected void AddVectorObs(int observation, int range)
         {
-            float[] oneHotVector = new float[range];
+            var oneHotVector = new float[range];
             oneHotVector[observation] = 1;
-            info.vectorObservation.AddRange(oneHotVector);
+            m_Info.vectorObservation.AddRange(oneHotVector);
         }
 
         /// <summary>
@@ -837,7 +813,7 @@ namespace MLAgents
         /// <param name="textObservation">The text observation.</param>
         public void SetTextObs(string textObservation)
         {
-            info.textObservation = textObservation;
+            m_Info.textObservation = textObservation;
         }
 
         /// <summary>
@@ -863,17 +839,17 @@ namespace MLAgents
         /// </param>
         /// <param name="textAction">Text action.</param>
         /// <param name="customAction">
-        /// A custom action, defined by the user as custom protobuffer message. Useful if the action is hard to encode
+        /// A custom action, defined by the user as custom protobuf message. Useful if the action is hard to encode
         /// as either a flat vector or a single string.
         /// </param>
-        public virtual void AgentAction(float[] vectorAction, string textAction, CommunicatorObjects.CustomAction customAction)
+        public virtual void AgentAction(float[] vectorAction, string textAction, CommunicatorObjects.CustomActionProto customAction)
         {
             // We fall back to not using the custom action if the subclassed Agent doesn't override this method.
             AgentAction(vectorAction, textAction);
         }
 
         /// <summary>
-        /// Specifies the agent behavior when done and 
+        /// Specifies the agent behavior when done and
         /// <see cref="AgentParameters.resetOnDone"/> is false. This method can be
         /// used to remove the agent from the scene.
         /// </summary>
@@ -891,14 +867,30 @@ namespace MLAgents
         }
 
         /// <summary>
+        /// This method will forcefully reset the agent and will also reset the hasAlreadyReset flag.
+        /// This way, even if the agent was already in the process of reseting, it will be reset again
+        /// and will not send a Done flag at the next step.
+        /// </summary>
+        void ForceReset()
+        {
+            m_HasAlreadyReset = false;
+            _AgentReset();
+        }
+
+        /// <summary>
         /// An internal reset method that updates internal data structures in
         /// addition to calling <see cref="AgentReset"/>.
         /// </summary>
         void _AgentReset()
         {
             ResetData();
-            stepCount = 0;
+            m_StepCount = 0;
             AgentReset();
+        }
+
+        public void UpdateAgentAction(AgentAction action)
+        {
+            m_Action = action;
         }
 
         /// <summary>
@@ -907,7 +899,7 @@ namespace MLAgents
         /// <param name="vectorActions">Vector actions.</param>
         public void UpdateVectorAction(float[] vectorActions)
         {
-            action.vectorActions = vectorActions;
+            m_Action.vectorActions = vectorActions;
         }
 
         /// <summary>
@@ -916,53 +908,34 @@ namespace MLAgents
         /// <param name="memories">Memories.</param>
         public void UpdateMemoriesAction(List<float> memories)
         {
-            action.memories = memories;
+            m_Action.memories = memories;
         }
-        
+
         public void AppendMemoriesAction(List<float> memories)
         {
-            action.memories.AddRange(memories);
+            m_Action.memories.AddRange(memories);
         }
 
         public List<float> GetMemoriesAction()
         {
-            return action.memories;
-        }
-
-        /// <summary>
-        /// Updates the text action.
-        /// </summary>
-        /// <param name="textActions">Text actions.</param>
-        public void UpdateTextAction(string textActions)
-        {
-            action.textActions = textActions;
-        }
-
-        /// <summary>
-        /// Updates the custom action.
-        /// </summary>
-        /// <param name="customAction">Custom action.</param>
-        public void UpdateCustomAction(CommunicatorObjects.CustomAction customAction)
-        {
-            action.customAction = customAction;
+            return m_Action.memories;
         }
 
         /// <summary>
         /// Updates the value of the agent.
         /// </summary>
-        /// <param name="textActions">Text actions.</param>
         public void UpdateValueAction(float value)
         {
-            action.value = value;
+            m_Action.value = value;
         }
 
         protected float GetValueEstimate()
         {
-            return action.value;
+            return m_Action.value;
         }
 
         /// <summary>
-        /// Scales continous action from [-1, 1] to arbitrary range.
+        /// Scales continuous action from [-1, 1] to arbitrary range.
         /// </summary>
         /// <param name="rawAction"></param>
         /// <param name="min"></param>
@@ -976,39 +949,19 @@ namespace MLAgents
         }
 
         /// <summary>
-        /// Sets the status of the agent.
+        /// Sets the status of the agent. Will request decisions or actions according
+        /// to the Academy's stepcount.
         /// </summary>
-        /// <param name="academyMaxStep">If set to <c>true</c> 
-        /// The agent must set maxStepReached.</param>
-        /// <param name="academyDone">If set to <c>true</c> 
-        /// The agent must set done.</param>
         /// <param name="academyStepCounter">Number of current steps in episode</param>
-        void SetStatus(bool academyMaxStep, bool academyDone, int academyStepCounter)
+        void SetStatus(int academyStepCounter)
         {
-            if (academyDone)
-            {
-                academyStepCounter = 0;
-            }
-
             MakeRequests(academyStepCounter);
-            if (academyMaxStep)
-            {
-                maxStepReached = true;
-            }
-
-            // If the Academy needs to reset, the agent should reset 
-            // even if it reseted recently.
-            if (academyDone)
-            {
-                Done();
-                hasAlreadyReset = false;
-            }
         }
 
         /// Signals the agent that it must reset if its done flag is set to true.
         void ResetIfDone()
         {
-            // If an agent is done, then it will also 
+            // If an agent is done, then it will also
             // request for a decision and an action
             if (IsDone())
             {
@@ -1016,24 +969,24 @@ namespace MLAgents
                 {
                     if (agentParameters.onDemandDecision)
                     {
-                        if (!hasAlreadyReset)
+                        if (!m_HasAlreadyReset)
                         {
                             // If event based, the agent can reset as soon
                             // as it is done
                             _AgentReset();
-                            hasAlreadyReset = true;
+                            m_HasAlreadyReset = true;
                         }
                     }
-                    else if (requestDecision)
+                    else if (m_RequestDecision)
                     {
                         // If not event based, the agent must wait to request a
-                        // decsion before reseting to keep multiple agents in sync.
+                        // decision before resetting to keep multiple agents in sync.
                         _AgentReset();
                     }
                 }
                 else
                 {
-                    terminate = true;
+                    m_Terminate = true;
                     RequestDecision();
                 }
             }
@@ -1044,49 +997,49 @@ namespace MLAgents
         /// </summary>
         void SendInfo()
         {
-            if (requestDecision)
+            if (m_RequestDecision)
             {
                 SendInfoToBrain();
                 ResetReward();
-                done = false;
-                maxStepReached = false;
-                requestDecision = false;
+                m_Done = false;
+                m_MaxStepReached = false;
+                m_RequestDecision = false;
 
-                hasAlreadyReset = false;
+                m_HasAlreadyReset = false;
             }
         }
 
         /// Used by the brain to make the agent perform a step.
         void AgentStep()
         {
-            if (terminate)
+            if (m_Terminate)
             {
-                terminate = false;
+                m_Terminate = false;
                 ResetReward();
-                done = false;
-                maxStepReached = false;
-                requestDecision = false;
-                requestAction = false;
+                m_Done = false;
+                m_MaxStepReached = false;
+                m_RequestDecision = false;
+                m_RequestAction = false;
 
-                hasAlreadyReset = false;
+                m_HasAlreadyReset = false;
                 OnDisable();
                 AgentOnDone();
             }
 
-            if ((requestAction) && (brain != null))
+            if ((m_RequestAction) && (m_Brain != null))
             {
-                requestAction = false;
-                AgentAction(action.vectorActions, action.textActions, action.customAction);
+                m_RequestAction = false;
+                AgentAction(m_Action.vectorActions, m_Action.textActions, m_Action.customAction);
             }
 
-            if ((stepCount >= agentParameters.maxStep)
+            if ((m_StepCount >= agentParameters.maxStep)
                 && (agentParameters.maxStep > 0))
             {
-                maxStepReached = true;
+                m_MaxStepReached = true;
                 Done();
             }
 
-            stepCount += 1;
+            m_StepCount += 1;
         }
 
         /// <summary>
@@ -1108,84 +1061,18 @@ namespace MLAgents
             }
         }
 
-        /// <summary>
-        /// Converts a camera and correspinding resolution to a 2D texture.
-        /// </summary>
-        /// <returns>The 2D texture.</returns>
-        /// <param name="obsCamera">Camera.</param>
-        /// <param name="width">Width of resulting 2D texture.</param>
-        /// <param name="height">Height of resulting 2D texture.</param>
-        /// <param name="texture2D">Texture2D to render to.</param>
-        public static void ObservationToTexture(Camera obsCamera, int width, int height, ref Texture2D texture2D)
+        void DecideAction()
         {
-            Rect oldRec = obsCamera.rect;
-            obsCamera.rect = new Rect(0f, 0f, 1f, 1f);
-            var depth = 24;
-            var format = RenderTextureFormat.Default;
-            var readWrite = RenderTextureReadWrite.Default;
-
-            var tempRT =
-                RenderTexture.GetTemporary(width, height, depth, format, readWrite);
-
-            if (width != texture2D.width || height != texture2D.height)
-            {
-                texture2D.Resize(width, height);
-            }
-
-            var prevActiveRT = RenderTexture.active;
-            var prevCameraRT = obsCamera.targetTexture;
-
-            // render to offscreen texture (readonly from CPU side)
-            RenderTexture.active = tempRT;
-            obsCamera.targetTexture = tempRT;
-
-            obsCamera.Render();
-
-            texture2D.ReadPixels(new Rect(0, 0, texture2D.width, texture2D.height), 0, 0);
-            texture2D.Apply();
-            obsCamera.targetTexture = prevCameraRT;
-            obsCamera.rect = oldRec;
-            RenderTexture.active = prevActiveRT;
-            RenderTexture.ReleaseTemporary(tempRT);
-        }
-        
-        /// <summary>
-        /// Converts a RenderTexture and correspinding resolution to a 2D texture.
-        /// </summary>
-        /// <returns>The 2D texture.</returns>
-        /// <param name="obsTexture">RenderTexture.</param>
-        /// <param name="width">Width of resulting 2D texture.</param>
-        /// <param name="height">Height of resulting 2D texture.</param>
-        /// <param name="texture2D">Texture2D to render to.</param>
-        public static void ObservationToTexture(RenderTexture obsTexture, int width, int height, ref Texture2D texture2D)
-        {
-            if (width != texture2D.width || height != texture2D.height)
-            {
-                texture2D.Resize(width, height);
-            }
-            
-            if(width != obsTexture.width || height != obsTexture.height)
-            {
-                throw new UnityAgentsException(string.Format(
-                    "RenderTexture {0} : width/height is {1}/{2} brain is expecting {3}/{4}.",
-                    obsTexture.name, obsTexture.width, obsTexture.height, width, height));
-            }
-
-            var prevActiveRT = RenderTexture.active;
-            RenderTexture.active = obsTexture;
-
-            texture2D.ReadPixels(new Rect(0, 0, texture2D.width, texture2D.height), 0, 0);
-            texture2D.Apply();
-            RenderTexture.active = prevActiveRT;
+            m_Brain?.DecideAction();
         }
 
         /// <summary>
         /// Sets the custom observation for the agent for this episode.
         /// </summary>
         /// <param name="customObservation">New value of the agent's custom observation.</param>
-        public void SetCustomObservation(CustomObservation customObservation)
+        public void SetCustomObservation(CommunicatorObjects.CustomObservationProto customObservation)
         {
-            info.customObservation = customObservation;
+            m_Info.customObservation = customObservation;
         }
-    }    
+    }
 }

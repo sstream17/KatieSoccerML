@@ -1,12 +1,7 @@
-﻿#define ENABLE_BARRACUDA
-#if ENABLE_BARRACUDA
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using Barracuda;
-using UnityEngine;
-using Tensor = MLAgents.InferenceBrain.Tensor;
 
 namespace MLAgents.InferenceBrain
 {
@@ -22,178 +17,153 @@ namespace MLAgents.InferenceBrain
             Discrete,
             Continuous
         }
-        private const long ApiVersion = 2;
-        private IWorker _engine;
-        private Model _model;
-        private BrainParameters _brainParameters;
-        private List<string> _failedModelChecks = new List<string>();
+        private const long k_ApiVersion = 2;
 
         /// <summary>
-        /// Factory for the ModelParamLoader : Creates a ModelParamLoader and runs the checks
-        /// on it.
+        /// Generates the Tensor inputs that are expected to be present in the Model.
         /// </summary>
-        /// <param name="engine"> The Barracuda engine worker we get the parameters and the checks from
+        /// <param name="model">
+        /// The Barracuda engine model for loading static parameters
         /// </param>
-        /// <param name="model"> The Barracuda engine model for loading static parameters
-        /// </param>
-        /// <param name="brainParameters"> The BrainParamters that are used verify the
-        /// compatibility with the InferenceEngine</param>
-        /// <returns></returns>
-        public static BarracudaModelParamLoader GetLoaderAndCheck(IWorker engine, Model model,
-            BrainParameters brainParameters)
+        /// <returns>TensorProxy IEnumerable with the expected Tensor inputs</returns>
+        public static IReadOnlyList<TensorProxy> GetInputTensors(Model model)
         {
-            BarracudaModelParamLoader modelParamLoader = new BarracudaModelParamLoader(engine, model, brainParameters);
-            modelParamLoader.GenerateChecks();
-            return modelParamLoader;
-        }
-        
-        private BarracudaModelParamLoader(IWorker engine, Model model, BrainParameters brainParameters)
-        {
-            _engine = engine;
-            _model = model;
-            _brainParameters = brainParameters;
-        }
+            var tensors = new List<TensorProxy>();
 
-        /// <summary>
-        /// Generates the Tensor inputs that are expected to be present in the Model. 
-        /// </summary>
-        /// <returns>Tensor IEnumerable with the expected Tensor inputs</returns>
-        public IReadOnlyList<Tensor> GetInputTensors()
-        {
-            List<Tensor> tensors = new List<Tensor>();
-
-            if (_model == null)
+            if (model == null)
                 return tensors;
-            
-            foreach (var input in _model.inputs)
+
+            foreach (var input in model.inputs)
             {
-                tensors.Add(new Tensor
+                tensors.Add(new TensorProxy
                 {
-                    Name = input.name,
-                    ValueType = Tensor.TensorType.FloatingPoint,
-                    Data = null,
-                    Shape = input.shape.Select(i => (long)i).ToArray()
+                    name = input.name,
+                    valueType = TensorProxy.TensorType.FloatingPoint,
+                    data = null,
+                    shape = input.shape.Select(i => (long)i).ToArray()
                 });
             }
-            
-            foreach (var mem in _model.memories)
+
+            foreach (var mem in model.memories)
             {
-                //Debug.Log($"{mem.input}: {mem.shape} -> {BarracudaUtils.FromBarracuda(mem.shape).Length}");
-                tensors.Add(new Tensor
+                tensors.Add(new TensorProxy
                 {
-                    Name = mem.input,
-                    ValueType = Tensor.TensorType.FloatingPoint,
-                    Data = null,
-                    Shape = BarracudaUtils.FromBarracuda(mem.shape)
+                    name = mem.input,
+                    valueType = TensorProxy.TensorType.FloatingPoint,
+                    data = null,
+                    shape = TensorUtils.TensorShapeFromBarracuda(mem.shape)
                 });
             }
-            
-            tensors.Sort((el1, el2) => el1.Name.CompareTo(el2.Name));
-            
+
+            tensors.Sort((el1, el2) => el1.name.CompareTo(el2.name));
+
             return tensors;
         }
-        
+
         /// <summary>
-        /// Generates the Tensor outputs that are expected to be present in the Model. 
+        /// Generates the Tensor outputs that are expected to be present in the Model.
         /// </summary>
-        /// <returns>Tensor IEnumerable with the expected Tensor outputs</returns>
-        public string[] GetOutputNames()
+        /// <param name="model">
+        /// The Barracuda engine model for loading static parameters
+        /// </param>
+        /// <returns>TensorProxy IEnumerable with the expected Tensor outputs</returns>
+        public static string[] GetOutputNames(Model model)
         {
             var names = new List<string>();
 
-            if (_model == null)
+            if (model == null)
+            {
                 return names.ToArray();
-            
-            names.Add(TensorNames.ActionOutput);                
-             
-            var memory = GetIntScalar(TensorNames.MemorySize);
+            }
+
+            names.Add(TensorNames.ActionOutput);
+
+            var memory = (int)model.GetTensorByName(TensorNames.MemorySize)[0];
             if (memory > 0)
             {
-                foreach (var mem in _model.memories)
+                foreach (var mem in model.memories)
                 {
                     names.Add(mem.output);
                 }
             }
 
             names.Sort();
-            
+
             return names.ToArray();
         }
 
         /// <summary>
-        /// Queries the InferenceEngine for the value of a variable in the graph given its name.
-        /// Only works with int32 Tensors with zero dimensions containing a unique element.
-        /// If the node was not found or could not be retrieved, the value -1 will be returned. 
+        /// Factory for the ModelParamLoader : Creates a ModelParamLoader and runs the checks
+        /// on it.
         /// </summary>
-        /// <param name="name">The name of the Tensor variable</param>
-        /// <returns>The value of the scalar variable in the model. (-1 if not found)</returns>
-        private int GetIntScalar(string name)
+        /// <param name="model">
+        /// The Barracuda engine model for loading static parameters
+        /// </param>
+        /// <param name="brainParameters">
+        /// The BrainParameters that are used verify the compatibility with the InferenceEngine
+        /// </param>
+        /// <returns>The list the error messages of the checks that failed</returns>
+        public static IEnumerable<string> CheckModel(Model model, BrainParameters brainParameters)
         {
-            return (int)_model.GetTensorByName(name)[0];
-        }
-
-        /// <summary>
-        /// Retrieves an IEnumerable of string corresponding to the failed compatibility checks
-        /// between the InferenceEngine and the BrainParameters. 
-        /// </summary>
-        public IEnumerable<string> GetChecks()
-        {
-            return _failedModelChecks;
-        }
-
-        /// <summary>
-        /// Generates the list of failed checks that failed when comparing the data from the Model
-        /// and from the BrainParameters
-        /// </summary>
-        private void GenerateChecks()
-        {
-            _failedModelChecks.Clear();
-            if (_engine == null)
+            List<string> failedModelChecks = new List<string>();
+            if (model == null)
             {
-                _failedModelChecks.Add(
+                failedModelChecks.Add(
                     "There is no model for this Brain, cannot run inference. " +
                     "(But can still train)");
-                return;
+                return failedModelChecks;
             }
 
-            var modelApiVersion = GetIntScalar(TensorNames.VersionNumber);
-            var memorySize = GetIntScalar(TensorNames.MemorySize);
-            var isContinuousInt = GetIntScalar(TensorNames.IsContinuousControl);
+            var modelApiVersion = (int)model.GetTensorByName(TensorNames.VersionNumber)[0];
+            var memorySize = (int)model.GetTensorByName(TensorNames.MemorySize)[0];
+            var isContinuousInt = (int)model.GetTensorByName(TensorNames.IsContinuousControl)[0];
             var isContinuous = GetActionType(isContinuousInt);
-            var actionSize = GetIntScalar(TensorNames.ActionOutputShape);
+            var actionSize = (int)model.GetTensorByName(TensorNames.ActionOutputShape)[0];
             if (modelApiVersion == -1)
             {
-                _failedModelChecks.Add(
-                    "Model was not trained using the right version of ML-Agents. Cannot use this " +
-                    "model.");
-                return;
+                failedModelChecks.Add(
+                    "Model was not trained using the right version of ML-Agents. " +
+                    "Cannot use this model.");
+                return failedModelChecks;
             }
-            if (modelApiVersion != ApiVersion)
+            if (modelApiVersion != k_ApiVersion)
             {
-                _failedModelChecks.Add(
+                failedModelChecks.Add(
                     $"Version of the trainer the model was trained with ({modelApiVersion}) " +
-                    $"is not compatible with the Brain's version ({ApiVersion}).");
-                return;
+                    $"is not compatible with the Brain's version ({k_ApiVersion}).");
+                return failedModelChecks;
             }
 
-            CheckIntScalarPresenceHelper(new Dictionary<string, int>()
-            {
-                {TensorNames.MemorySize, memorySize},
-                {TensorNames.IsContinuousControl, isContinuousInt},
-                {TensorNames.ActionOutputShape, actionSize}
-            });
-            CheckInputTensorPresence(memorySize, isContinuous);
-            CheckOutputTensorPresence(memorySize);
-            CheckInputTensorShape();
-            CheckOutputTensorShape(isContinuous, actionSize);
+            failedModelChecks.AddRange(
+                CheckIntScalarPresenceHelper(new Dictionary<string, int>()
+                {
+                    {TensorNames.MemorySize, memorySize},
+                    {TensorNames.IsContinuousControl, isContinuousInt},
+                    {TensorNames.ActionOutputShape, actionSize}
+                })
+            );
+            failedModelChecks.AddRange(
+                CheckInputTensorPresence(model, brainParameters, memorySize, isContinuous)
+            );
+            failedModelChecks.AddRange(
+                CheckOutputTensorPresence(model, memorySize))
+            ;
+            failedModelChecks.AddRange(
+                CheckInputTensorShape(model, brainParameters)
+            );
+            failedModelChecks.AddRange(
+                CheckOutputTensorShape(model, brainParameters, isContinuous, actionSize)
+            );
+            return failedModelChecks;
         }
 
         /// <summary>
         /// Converts the integer value in the model corresponding to the type of control to a
         /// ModelActionType.
         /// </summary>
-        /// <param name="isContinuousInt"> The integer value in the model indicating the
-        /// type of control</param>
+        /// <param name="isContinuousInt">
+        /// The integer value in the model indicating the type of control
+        /// </param>
         /// <returns>The equivalent ModelActionType</returns>
         private static ModelActionType GetActionType(int isContinuousInt)
         {
@@ -203,7 +173,7 @@ namespace MLAgents.InferenceBrain
                 case 0:
                     isContinuous = ModelActionType.Discrete;
                     break;
-                case 1: 
+                case 1:
                     isContinuous = ModelActionType.Continuous;
                     break;
                 default:
@@ -218,253 +188,274 @@ namespace MLAgents.InferenceBrain
         /// invalid value of -1.
         /// </summary>
         /// <param name="requiredScalarFields"> Mapping from node names to int values</param>
-        private void CheckIntScalarPresenceHelper(Dictionary<string, int> requiredScalarFields)
+        /// <returns>The list the error messages of the checks that failed</returns>
+        private static IEnumerable<string> CheckIntScalarPresenceHelper(
+            Dictionary<string, int> requiredScalarFields)
         {
-            foreach(var field in requiredScalarFields)
-            if (field.Value == -1)
+            var failedModelChecks = new List<string>();
+            foreach (var field in requiredScalarFields)
             {
-                _failedModelChecks.Add(
-                    $"Missing node in the model provided : {field.Key}");
+                if (field.Value == -1)
+                {
+                    failedModelChecks.Add($"Missing node in the model provided : {field.Key}");
+                }
             }
+            return failedModelChecks;
         }
 
         /// <summary>
         /// Generates failed checks that correspond to inputs expected by the model that are not
         /// present in the BrainParameters.
         /// </summary>
-        /// <param name="memory"> The memory size that the model is expecting/</param>
-        /// <param name="isContinuous"> Whether the model is expecting continuous or
-        /// discrete control.</param>
-        /// <returns>A IEnumerable of string corresponding to the failed input presence
-        /// checks.</returns>
-        private void CheckInputTensorPresence(int memory, ModelActionType isContinuous)
+        /// <param name="model">
+        /// The Barracuda engine model for loading static parameters
+        /// </param>
+        /// <param name="brainParameters">
+        /// The BrainParameters that are used verify the compatibility with the InferenceEngine
+        /// </param>
+        /// <param name="memory">
+        /// The memory size that the model is expecting.
+        /// </param>
+        /// <param name="isContinuous">
+        /// Whether the model is expecting continuous or discrete control.
+        /// </param>
+        /// <returns>
+        /// A IEnumerable of string corresponding to the failed input presence checks.
+        /// </returns>
+        private static IEnumerable<string> CheckInputTensorPresence(
+            Model model,
+            BrainParameters brainParameters,
+            int memory,
+            ModelActionType isContinuous)
         {
-            var tensorsNames = GetInputTensors().Select(x => x.Name).ToList();
-            
+            var failedModelChecks = new List<string>();
+            var tensorsNames = GetInputTensors(model).Select(x => x.name).ToList();
+
             // If there is no Vector Observation Input but the Brain Parameters expect one.
-            if ((_brainParameters.vectorObservationSize != 0) &&
+            if ((brainParameters.vectorObservationSize != 0) &&
                 (!tensorsNames.Contains(TensorNames.VectorObservationPlacholder)))
             {
-                _failedModelChecks.Add(
+                failedModelChecks.Add(
                     "The model does not contain a Vector Observation  Placeholder Input. " +
                     "You must set the Vector Observation Space Size to 0.");
             }
-            // If there are not enough Visual Observation Input compared to what the
-            // Brain Parameters expect.
-            for (var visObsIndex = 0;
-                visObsIndex < _brainParameters.cameraResolutions.Length;
-                visObsIndex++)
-            {
-                if (!tensorsNames.Contains(
-                    TensorNames.VisualObservationPlaceholderPrefix + visObsIndex))
-                {
-                    _failedModelChecks.Add(
-                        "The model does not contain a Visual Observation Placeholder Input " +
-                        "for visual observation "+visObsIndex+".");
-                }
-            }
+
+            // TODO reenable checks there are enough Visual Observation Placeholder in the model.
+
             // If the model has a non-negative memory size but requires a recurrent input
             if (memory > 0)
             {
                 if (!tensorsNames.Any(x => x.EndsWith("_h")) ||
                     !tensorsNames.Any(x => x.EndsWith("_c")))
                 {
-                    _failedModelChecks.Add(
+                    failedModelChecks.Add(
                         "The model does not contain a Recurrent Input Node but has memory_size.");
                 }
             }
+
             // If the model uses discrete control but does not have an input for action masks
             if (isContinuous == ModelActionType.Discrete)
             {
                 if (!tensorsNames.Contains(TensorNames.ActionMaskPlaceholder))
                 {
-                    _failedModelChecks.Add(
+                    failedModelChecks.Add(
                         "The model does not contain an Action Mask but is using Discrete Control.");
                 }
             }
+            return failedModelChecks;
         }
-        
+
         /// <summary>
         /// Generates failed checks that correspond to outputs expected by the model that are not
         /// present in the BrainParameters.
         /// </summary>
-        /// <param name="memory"> The memory size that the model is expecting/</param>
-        /// <returns>A IEnumerable of string corresponding to the failed output presence
-        /// checks.</returns>
-        private void CheckOutputTensorPresence(int memory)
+        /// <param name="model">
+        /// The Barracuda engine model for loading static parameters
+        /// </param>
+        /// <param name="memory">The memory size that the model is expecting/</param>
+        /// <returns>
+        /// A IEnumerable of string corresponding to the failed output presence checks.
+        /// </returns>
+        private static IEnumerable<string> CheckOutputTensorPresence(Model model, int memory)
         {
+            var failedModelChecks = new List<string>();
             // If there is no Action Output.
-            if (!_model.outputs.Contains(TensorNames.ActionOutput))
+            if (!model.outputs.Contains(TensorNames.ActionOutput))
             {
-                _failedModelChecks.Add("The model does not contain an Action Output Node.");
+                failedModelChecks.Add("The model does not contain an Action Output Node.");
             }
-            
+
             // If there is no Recurrent Output but the model is Recurrent.
             if (memory > 0)
             {
-                var memOutputs = _model.memories.Select(x => x.output).ToList();
-                
-                if (!memOutputs.Any(x => x.EndsWith("_h")) || 
+                var memOutputs = model.memories.Select(x => x.output).ToList();
+
+                if (!memOutputs.Any(x => x.EndsWith("_h")) ||
                     !memOutputs.Any(x => x.EndsWith("_c")))
                 {
-                    _failedModelChecks.Add(
+                    failedModelChecks.Add(
                         "The model does not contain a Recurrent Output Node but has memory_size.");
                 }
             }
+            return failedModelChecks;
         }
-        
+
         /// <summary>
         /// Generates failed checks that correspond to inputs shapes incompatibilities between
         /// the model and the BrainParameters.
         /// </summary>
-        private void CheckInputTensorShape()
+        /// <param name="model">
+        /// The Barracuda engine model for loading static parameters
+        /// </param>
+        /// <param name="brainParameters">
+        /// The BrainParameters that are used verify the compatibility with the InferenceEngine
+        /// </param>
+        /// <returns>The list the error messages of the checks that failed</returns>
+        private static IEnumerable<string> CheckInputTensorShape(
+            Model model, BrainParameters brainParameters)
         {
+            var failedModelChecks = new List<string>();
             var tensorTester =
-                new Dictionary<string, Func<Tensor, string>>()
-                {
-                    {TensorNames.VectorObservationPlacholder, CheckVectorObsShape},
-                    {TensorNames.PreviousActionPlaceholder, CheckPreviousActionShape},
-                    {TensorNames.RandomNormalEpsilonPlaceholder, ((tensor) => null)},
-                    {TensorNames.ActionMaskPlaceholder, ((tensor) => null)},
-                    {TensorNames.SequenceLengthPlaceholder, ((tensor) => null)},
-                    {TensorNames.RecurrentInPlaceholder, ((tensor) => null)},
-                };
+                new Dictionary<string, Func<BrainParameters, TensorProxy, string>>()
+            {
+                {TensorNames.VectorObservationPlacholder, CheckVectorObsShape},
+                {TensorNames.PreviousActionPlaceholder, CheckPreviousActionShape},
+                {TensorNames.RandomNormalEpsilonPlaceholder, ((bp, tensor) => null)},
+                {TensorNames.ActionMaskPlaceholder, ((bp, tensor) => null)},
+                {TensorNames.SequenceLengthPlaceholder, ((bp, tensor) => null)},
+                {TensorNames.RecurrentInPlaceholder, ((bp, tensor) => null)},
+            };
 
-            foreach (var mem in _model.memories)
-                tensorTester[mem.input] = ((tensor) => null);
-            
-            for (var obsIndex = 0; obsIndex < _brainParameters.cameraResolutions.Length; obsIndex++)
+            foreach (var mem in model.memories)
             {
-                var index = obsIndex;
-                tensorTester[TensorNames.VisualObservationPlaceholderPrefix + obsIndex] =
-                    (tensor) => CheckVisualObsShape(tensor, index);
+                tensorTester[mem.input] = ((bp, tensor) => null);
             }
+
+            // TODO reenable checks on visual observation shapes.
+
             // If the model expects an input but it is not in this list
-            foreach (var tensor in GetInputTensors())
+            foreach (var tensor in GetInputTensors(model))
             {
-                if (!tensorTester.ContainsKey(tensor.Name))
+                if (!tensorTester.ContainsKey(tensor.name))
                 {
-                    _failedModelChecks.Add(
-                        "Model requires an unknown input named : " + tensor.Name);
+                    if (!tensor.name.Contains("visual_observation"))
+                    {
+                        failedModelChecks.Add(
+                            "Model requires an unknown input named : " + tensor.name);
+                    }
                 }
                 else
                 {
-                    var tester = tensorTester[tensor.Name];
-                    var error = tester.Invoke(tensor);
+                    var tester = tensorTester[tensor.name];
+                    var error = tester.Invoke(brainParameters, tensor);
                     if (error != null)
                     {
-                        _failedModelChecks.Add(error);
+                        failedModelChecks.Add(error);
                     }
                 }
             }
+            return failedModelChecks;
         }
-        
+
         /// <summary>
         /// Checks that the shape of the Vector Observation input placeholder is the same in the
         /// model and in the Brain Parameters.
         /// </summary>
-        /// <param name="tensor"> The tensor that is expected by the model</param>
-        /// <returns>If the Check failed, returns a string containing information about why the
-        /// check failed. If the check passed, returns null.</returns>
-        private string CheckVectorObsShape(Tensor tensor)
+        /// <param name="brainParameters">
+        /// The BrainParameters that are used verify the compatibility with the InferenceEngine
+        /// </param>
+        /// <param name="tensorProxy">The tensor that is expected by the model</param>
+        /// <returns>
+        /// If the Check failed, returns a string containing information about why the
+        /// check failed. If the check passed, returns null.
+        /// </returns>
+        private static string CheckVectorObsShape(
+            BrainParameters brainParameters, TensorProxy tensorProxy)
         {
-            var vecObsSizeBp = _brainParameters.vectorObservationSize;
-            var numStackedVector = _brainParameters.numStackedVectorObservations;
-            var totalVecObsSizeT = tensor.Shape[tensor.Shape.Length - 1];
+            var vecObsSizeBp = brainParameters.vectorObservationSize;
+            var numStackedVector = brainParameters.numStackedVectorObservations;
+            var totalVecObsSizeT = tensorProxy.shape[tensorProxy.shape.Length - 1];
             if (vecObsSizeBp * numStackedVector != totalVecObsSizeT)
             {
-                return string.Format(
-                    "Vector Observation Size of the model does not match. " +
-                    "Received {0} x {1} but was expecting {2}.",
-                    vecObsSizeBp, numStackedVector, totalVecObsSizeT);
+                return "Vector Observation Size of the model does not match. Received " +
+                    $"{vecObsSizeBp} x {numStackedVector} but was expecting {totalVecObsSizeT}.";
             }
             return null;
         }
-        
+
         /// <summary>
         /// Checks that the shape of the Previous Vector Action input placeholder is the same in the
         /// model and in the Brain Parameters.
         /// </summary>
-        /// <param name="tensor"> The tensor that is expected by the model</param>
+        /// <param name="brainParameters">
+        /// The BrainParameters that are used verify the compatibility with the InferenceEngine
+        /// </param>
+        /// <param name="tensorProxy"> The tensor that is expected by the model</param>
         /// <returns>If the Check failed, returns a string containing information about why the
         /// check failed. If the check passed, returns null.</returns>
-        private string CheckPreviousActionShape(Tensor tensor)
+        private static string CheckPreviousActionShape(
+            BrainParameters brainParameters, TensorProxy tensorProxy)
         {
-            var numberActionsBp = _brainParameters.vectorActionSize.Length;
-            var numberActionsT = tensor.Shape[tensor.Shape.Length - 1];
-            if  (numberActionsBp != numberActionsT)
+            var numberActionsBp = brainParameters.vectorActionSize.Length;
+            var numberActionsT = tensorProxy.shape[tensorProxy.shape.Length - 1];
+            if (numberActionsBp != numberActionsT)
             {
-                return string.Format(
-                    "Previous Action Size of the model does not match. " +
-                    "Received {0} but was expecting {1}.",
-                    numberActionsBp, numberActionsT);
+                return "Previous Action Size of the model does not match. " +
+                    $"Received {numberActionsBp} but was expecting {numberActionsT}.";
             }
             return null;
         }
-        
-        /// <summary>
-        /// Checks that the shape of the visual observation input placeholder is the same in the
-        /// model and in the Brain Parameters.
-        /// </summary>
-        /// <param name="tensor"> The tensor that is expected by the model</param>
-        /// <param name="visObsIndex"> The index of the visual observation.</param>
-        /// <returns>If the Check failed, returns a string containing information about why the
-        /// check failed. If the check passed, returns null.</returns>
-        private string CheckVisualObsShape(Tensor tensor, int visObsIndex)
-        {
-            var resolutionBp = _brainParameters.cameraResolutions[visObsIndex];
-            var widthBp = resolutionBp.width;
-            var heightBp = resolutionBp.height;
-            var pixelBp = resolutionBp.blackAndWhite ? 1 : 3;  
-            var heightT = tensor.Shape[1];
-            var widthT = tensor.Shape[2];
-            var pixelT = tensor.Shape[3];
-            if  ((widthBp != widthT) || (heightBp != heightT) || (pixelBp != pixelT))
-            {
-                return string.Format(
-                    "The visual Observation {0} of the model does not match. " +
-                    "Received Tensor of shape [?x{1}x{2}x{3}] but was expecting [?x{4}x{5}x{6}].",
-                    visObsIndex, widthBp, heightBp, pixelBp, widthT, heightT, pixelT);
-            }
-            return null;
-        }
-        
+
         /// <summary>
         /// Generates failed checks that correspond to output shapes incompatibilities between
         /// the model and the BrainParameters.
         /// </summary>
-        /// <param name="isContinuous"> Whether the model is expecting continuous or
-        /// discrete control.</param>
-        /// <param name="modelActionSize"> The size of the action output that is expected
-        /// by the model.</param>
-        /// <returns>A IEnumerable of string corresponding to the incompatible shapes between
-        /// model and BrainParameters.</returns>
-        private void CheckOutputTensorShape(ModelActionType isContinuous, int modelActionSize)
+        /// <param name="model">
+        /// The Barracuda engine model for loading static parameters
+        /// </param>
+        /// <param name="brainParameters">
+        /// The BrainParameters that are used verify the compatibility with the InferenceEngine
+        /// </param>
+        /// <param name="isContinuous">
+        /// Whether the model is expecting continuous or discrete control.
+        /// </param>
+        /// <param name="modelActionSize">
+        /// The size of the action output that is expected by the model.
+        /// </param>
+        /// <returns>
+        /// A IEnumerable of string corresponding to the incompatible shapes between model
+        /// and BrainParameters.
+        /// </returns>
+        private static IEnumerable<string> CheckOutputTensorShape(
+            Model model,
+            BrainParameters brainParameters,
+            ModelActionType isContinuous,
+            int modelActionSize)
         {
+            var failedModelChecks = new List<string>();
             if (isContinuous == ModelActionType.Unknown)
             {
-                _failedModelChecks.Add(
-                    "Cannot infer type of Control from the provided model.");
-                return;
+                failedModelChecks.Add("Cannot infer type of Control from the provided model.");
+                return failedModelChecks;
             }
             if (isContinuous == ModelActionType.Continuous &&
-                _brainParameters.vectorActionSpaceType != SpaceType.continuous)
+                brainParameters.vectorActionSpaceType != SpaceType.Continuous)
             {
-                _failedModelChecks.Add(
+                failedModelChecks.Add(
                     "Model has been trained using Continuous Control but the Brain Parameters " +
                     "suggest Discrete Control.");
-                return;
+                return failedModelChecks;
             }
             if (isContinuous == ModelActionType.Discrete &&
-                _brainParameters.vectorActionSpaceType != SpaceType.discrete)
+                brainParameters.vectorActionSpaceType != SpaceType.Discrete)
             {
-                _failedModelChecks.Add(
+                failedModelChecks.Add(
                     "Model has been trained using Discrete Control but the Brain Parameters " +
                     "suggest Continuous Control.");
-                return;
+                return failedModelChecks;
             }
-            var tensorTester = new Dictionary<string, Func<TensorShape, int, string>>();
-            if (_brainParameters.vectorActionSpaceType == SpaceType.continuous)
+            var tensorTester = new Dictionary<string, Func<BrainParameters, TensorShape, int, string>>();
+            if (brainParameters.vectorActionSpaceType == SpaceType.Continuous)
             {
                 tensorTester[TensorNames.ActionOutput] = CheckContinuousActionOutputShape;
             }
@@ -473,147 +464,71 @@ namespace MLAgents.InferenceBrain
                 tensorTester[TensorNames.ActionOutput] = CheckDiscreteActionOutputShape;
             }
             // If the model expects an output but it is not in this list
-            foreach (var name in _model.outputs)
+            foreach (var name in model.outputs)
             {
                 if (tensorTester.ContainsKey(name))
                 {
                     var tester = tensorTester[name];
-                    var error = tester.Invoke(_model.GetShapeByName(name), modelActionSize);
+                    var error = tester.Invoke(brainParameters, model.GetShapeByName(name), modelActionSize);
                     if (error != null)
                     {
-                        _failedModelChecks.Add(error);
+                        failedModelChecks.Add(error);
                     }
                 }
             }
+            return failedModelChecks;
         }
 
         /// <summary>
         /// Checks that the shape of the discrete action output is the same in the
         /// model and in the Brain Parameters.
         /// </summary>
+        /// <param name="brainParameters">
+        /// The BrainParameters that are used verify the compatibility with the InferenceEngine
+        /// </param>
         /// <param name="shape"> The tensor shape that is expected by the model</param>
-        /// <param name="modelActionSize"> The size of the action output that is expected
-        /// by the model.</param>
-        /// <returns>If the Check failed, returns a string containing information about why the
-        /// check failed. If the check passed, returns null.</returns>
-        private string CheckDiscreteActionOutputShape(TensorShape shape, int modelActionSize)
+        /// <param name="modelActionSize">
+        /// The size of the action output that is expected by the model.
+        /// </param>
+        /// <returns>
+        /// If the Check failed, returns a string containing information about why the
+        /// check failed. If the check passed, returns null.
+        /// </returns>
+        private static string CheckDiscreteActionOutputShape(
+            BrainParameters brainParameters, TensorShape shape, int modelActionSize)
         {
-            var bpActionSize = _brainParameters.vectorActionSize.Sum();
-            if  (modelActionSize != bpActionSize)
+            var bpActionSize = brainParameters.vectorActionSize.Sum();
+            if (modelActionSize != bpActionSize)
             {
-                return string.Format(
-                    "Action Size of the model does not match. " +
-                    "The BrainParameters expect {0} but the model contains {1}.",
-                    bpActionSize, modelActionSize);
+                return "Action Size of the model does not match. The BrainParameters expect " +
+                    $"{bpActionSize} but the model contains {modelActionSize}.";
             }
             return null;
         }
-        
+
         /// <summary>
         /// Checks that the shape of the continuous action output is the same in the
         /// model and in the Brain Parameters.
         /// </summary>
+        /// <param name="brainParameters">
+        /// The BrainParameters that are used verify the compatibility with the InferenceEngine
+        /// </param>
         /// <param name="shape"> The tensor shape that is expected by the model</param>
-        /// <param name="modelActionSize"> The size of the action output that is expected
-        /// by the model.</param>
+        /// <param name="modelActionSize">
+        /// The size of the action output that is expected by the model.
+        /// </param>
         /// <returns>If the Check failed, returns a string containing information about why the
         /// check failed. If the check passed, returns null.</returns>
-        private string CheckContinuousActionOutputShape(TensorShape shape, int modelActionSize)
+        private static string CheckContinuousActionOutputShape(
+            BrainParameters brainParameters, TensorShape shape, int modelActionSize)
         {
-            var bpActionSize = _brainParameters.vectorActionSize[0];
-            if  (modelActionSize != bpActionSize)
+            var bpActionSize = brainParameters.vectorActionSize[0];
+            if (modelActionSize != bpActionSize)
             {
-                return string.Format(
-                    "Action Size of the model does not match. " +
-                    "The BrainParameters expect {0} but the model contains {1}.",
-                    bpActionSize, modelActionSize);
+                return "Action Size of the model does not match. The BrainParameters expect " +
+                    $"{bpActionSize} but the model contains {modelActionSize}.";
             }
             return null;
         }
     }
 }
-
-public class BarracudaUtils
-{
-    private static Array LinearizeArray(Array src)  
-    {
-        var elementType = src.GetType().GetElementType();
-        var elementSize = Marshal.SizeOf(elementType);
-        var dest = Array.CreateInstance(elementType, src.Length);
-        Buffer.BlockCopy(src, 0, dest, 0, src.Length * elementSize);
-        return dest;
-    }
-    
-    protected static Barracuda.TensorShape ToBarracuda(long[] src)
-    {
-        if (src.Length > 4)
-            throw new NotImplementedException("Barracuda does not support Tensor shapes with rank higher than 4");
-
-        var shape = new int[4];
-
-        if (src.Length == 2)
-        {
-            shape[0] = (int)src[0];
-            shape[1] = 1;
-            shape[2] = 1;
-            shape[3] = (int)src[1];
-        }
-        else
-        {
-            for (var axis = 0; axis < src.Length; ++axis)
-                shape[shape.Length-axis-1] = (int)src[src.Length-axis-1];
-        }
-        
-        return new Barracuda.TensorShape(shape);
-    }
-    
-    private static float[] IntArrayToFloatArray(int[] src)
-    {
-        var dest = new float[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            dest[i] = (float) src[i];
-
-        return dest;
-    }
-    
-    public static Barracuda.Tensor ToBarracuda(MLAgents.InferenceBrain.Tensor src)
-    {
-        Array linearArray = LinearizeArray(src.Data);
-
-        if (linearArray.GetType().GetElementType() == typeof(int))
-            linearArray = IntArrayToFloatArray(linearArray as int[]);
-
-        var shape = ToBarracuda(src.Shape);
-        return new Barracuda.Tensor(shape,  linearArray as float[], src.Name);
-    }
-    
-    internal static long[] FromBarracuda(Barracuda.TensorShape src)
-    {
-        if (src.height == 1 && src.width == 1)
-            return new long[2] {src.batch, src.channels};
-
-        return new long[4] {src.batch, src.height, src.width, src.channels};
-    }
-    
-    private static Array ReshapeArray(Array src, long[] shape)
-    {
-        var elementType = src.GetType().GetElementType();
-        var elementSize = Marshal.SizeOf(elementType);
-        var dest = Array.CreateInstance(elementType, shape);
-        Buffer.BlockCopy(src, 0, dest, 0, dest.Length * elementSize);
-        return dest;
-    }
-    
-    public static Tensor FromBarracuda(Barracuda.Tensor src, string nameOverride = null)
-    {
-        var shape = FromBarracuda(src.shape);
-        return new Tensor
-        {
-            Name = nameOverride ?? src.name,
-            ValueType = Tensor.TensorType.FloatingPoint,
-            Shape = shape,
-            Data = ReshapeArray(src.data.Download(src.length), shape)
-        };
-    }
-}
-#endif
