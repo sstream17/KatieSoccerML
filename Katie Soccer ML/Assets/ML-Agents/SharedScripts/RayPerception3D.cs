@@ -46,7 +46,7 @@ namespace MLAgents
 
             Transform rotatedTransform = new GameObject().transform;
             rotatedTransform.position = startingTransform.position;
-            rotatedTransform.rotation = Quaternion.LookRotation(Vector3.forward);
+            rotatedTransform.rotation = Quaternion.LookRotation(Vector3.up, Vector3.forward);
 
             // For each ray sublist stores categorical information on detected object
             // along with object distance.
@@ -54,17 +54,17 @@ namespace MLAgents
             {
                 m_EndPosition = rotatedTransform.TransformDirection(
                     PolarToCartesian(rayDistance, angle));
-                m_EndPosition.y = endOffset;
-                if (Application.isEditor && Math.Abs(endOffset - -0.1f) < 0.01f)
+                m_EndPosition.z = endOffset;
+                if (Application.isEditor)
                 {
-                    Debug.DrawRay(rotatedTransform.position + new Vector3(0f, startOffset, 0f),
+                    Debug.DrawRay(rotatedTransform.position + new Vector3(0f, 0f, startOffset),
                         m_EndPosition, Color.black, 1f, true);
                 }
 
                 Array.Clear(m_SubList, 0, m_SubList.Length);
 
                 if (Physics.SphereCast(rotatedTransform.position +
-                    new Vector3(0f, startOffset, 0f), 0.5f,
+                    new Vector3(0f, 0f, startOffset), 0.5f,
                     m_EndPosition, out m_Hit, rayDistance))
                 {
                     for (var i = 0; i < detectableObjects.Length; i++)
