@@ -521,8 +521,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_TrainingConfiguration:
-    width: 480
-    height: 480
+    width: 960
+    height: 960
     qualityLevel: 1
     timeScale: 25
     targetFrameRate: -1

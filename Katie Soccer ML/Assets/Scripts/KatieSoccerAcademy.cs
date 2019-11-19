@@ -1,4 +1,5 @@
 ﻿using MLAgents;
+using UnityEngine;
 
 public class KatieSoccerAcademy : Academy
 {
@@ -11,4 +12,32 @@ public class KatieSoccerAcademy : Academy
 	public float spawnAreaMarginMultiplier;
 
     public float TimePenalty = 500f;
+
+    public int MaxSteps = 7500;
+
+    private GameObject[] agents;
+
+    public override void AcademyReset()
+    {
+        base.AcademyReset();
+
+        agents = GameObject.FindGameObjectsWithTag("Agent");
+
+        foreach (var agentGameObject in agents)
+        {
+            KatieSoccerAgent agent = agentGameObject.GetComponent<KatieSoccerAgent>();
+            agent.Done();
+        }
+    }
+
+    public override void AcademyStep()
+    {
+        base.AcademyStep();
+
+        var steps = GetStepCount();
+        if (steps % MaxSteps == 0)
+        {
+            AcademyReset();
+        }
+    }
 }
