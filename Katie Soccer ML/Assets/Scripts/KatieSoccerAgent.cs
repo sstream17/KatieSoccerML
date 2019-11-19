@@ -96,11 +96,11 @@ public class KatieSoccerAgent : Agent
         {
             if (i < TeamPieces.Length)
             {
-                AddVectorObs(rayPerception.Perceive(TeamPieces[i].transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
+                AddVectorObs(rayPerception.Perceive(TeamPieces[i].transform, rayDistance, rayAngles, detectableObjects));
             }
             else
             {
-                AddVectorObs(rayPerception.Perceive(transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
+                AddVectorObs(rayPerception.Perceive(transform, rayDistance, rayAngles, detectableObjects));
             }
         }
 
@@ -108,15 +108,15 @@ public class KatieSoccerAgent : Agent
         {
             if (i < OpposingPieces.Length)
             {
-                AddVectorObs(rayPerception.Perceive(OpposingPieces[i].transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
+                AddVectorObs(rayPerception.Perceive(OpposingPieces[i].transform, rayDistance, rayAngles, detectableObjects));
             }
             else
             {
-                AddVectorObs(rayPerception.Perceive(transform, rayDistance, rayAngles, detectableObjects, 0f, 0f));
+                AddVectorObs(rayPerception.Perceive(transform, rayDistance, rayAngles, detectableObjects));
             }
         }
 
-        AddVectorObs(rayPerception.Perceive(ball.transform, rayDistance, rayAngles, detectableObjects, 0f, -0.1f));
+        AddVectorObs(rayPerception.Perceive(ball.transform, rayDistance, rayAngles, detectableObjects));
     }
 
     public override void AgentAction(float[] vectorAction, string textAction)
