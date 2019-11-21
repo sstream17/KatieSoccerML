@@ -44,8 +44,6 @@ public class KatieSoccerAgent : Agent
     private float MaxY = 2.1f;
     private float ballZ = 1.65f;
     private float pieceZ = 1.7f;
-    private float fieldWidth = 11.95f;
-    private float fieldHeight = 6.45f;
 
     public override void InitializeAgent()
     {
