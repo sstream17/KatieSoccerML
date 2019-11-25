@@ -90,6 +90,11 @@ public class KatieSoccerAgent : Agent
     public override void CollectObservations()
     {
         var detectableObjects = new[] { "Ball", "TeamOneGoal", "TeamTwoGoal", "Wall", "TeamOnePiece", "TeamTwoPiece" };
+        if (gameObject.name.Equals("TeamOnePieces"))
+        {
+            detectableObjects = new[] { "Ball", "TeamTwoGoal", "TeamOneGoal", "Wall", "TeamTwoPiece", "TeamOnePiece" };
+        }
+        
         for (int i = 0; i < numberOfPieces; i++)
         {
             if (i < TeamPieces.Length)
