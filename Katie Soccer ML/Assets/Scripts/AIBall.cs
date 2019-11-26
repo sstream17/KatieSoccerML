@@ -2,7 +2,7 @@
 
 public class AIBall : MonoBehaviour
 {
-    public AIGameScriptOneTeam GameScript;
+    public AIGameScript GameScript;
     private PieceMovement pieceMovement;
     public bool Hit = false;
 
