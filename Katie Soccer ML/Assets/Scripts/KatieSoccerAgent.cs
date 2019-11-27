@@ -89,7 +89,7 @@ public class KatieSoccerAgent : Agent
 
         if (Score != null)
         {
-            Score.text = GetCumulativeReward().ToString();
+            Score.text = GetCumulativeReward().ToString("f3");
         }
     }
 
