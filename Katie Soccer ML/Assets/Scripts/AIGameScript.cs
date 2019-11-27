@@ -151,6 +151,8 @@ public class AIGameScript : MonoBehaviour
 
     public void StartScoreForDistance()
     {
+        AIBall aiBall = Ball.GetComponent<AIBall>();
+        aiBall.Hit = false;
         if (currentTurn.Equals(Team.TeamOne))
         {
             StartCoroutine(TeamOneAgent.ComputeDistanceScore());
