@@ -150,7 +150,7 @@ public class AIGameScriptOneTeam : MonoBehaviour
 
     public void StartScoreForDistance()
     {
-        AIBall aiBall = Ball.GetComponent<AIBall>();
+        AIBallOneTeam aiBall = Ball.GetComponent<AIBallOneTeam>();
         aiBall.Hit = false;
         if (currentTurn.Equals(Team.TeamOne))
         {
