@@ -1,8 +1,8 @@
 ﻿using UnityEngine;
 
-public class AIBall : MonoBehaviour
+public class AIBallOneTeam : MonoBehaviour
 {
-    public AIGameScript GameScript;
+    public AIGameScriptOneTeam GameScript;
     private PieceMovement pieceMovement;
     public bool Hit = false;
 
