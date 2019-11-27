@@ -10,6 +10,7 @@ public class KatieSoccerAgent : Agent
     public KatieSoccerAgent opposingAgent;
     public GameObject[] TeamPieces;
     public GameObject[] OpposingPieces;
+    public TextMeshProUGUI Score;
 
     /// <summary>
     /// The goal to push the block to.
@@ -84,6 +85,11 @@ public class KatieSoccerAgent : Agent
         {
             AllowShot = false;
             RequestDecision();
+        }
+
+        if (Score != null)
+        {
+            Score.text = GetCumulativeReward().ToString();
         }
     }
 
@@ -189,12 +195,13 @@ public class KatieSoccerAgent : Agent
 
         // By marking an agent as done AgentReset() will be called automatically.
         Done();
-        ////opposingAgent.Done();
     }
 
     public void OpponentScored()
     {
         AddReward(-goalReward);
+
+        Done();
     }
 
     /// <summary>
