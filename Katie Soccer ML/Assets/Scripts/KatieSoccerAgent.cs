@@ -232,5 +232,15 @@ public class KatieSoccerAgent : Agent
             PieceMovement pieceMovement = piece.gameObject.GetComponent<PieceMovement>();
             pieceMovement.SetStartingPositions();
         }
+
+        foreach (GameObject piece in OpposingPieces)
+        {
+            Rigidbody rb = piece.GetComponent<Rigidbody>();
+            rb.velocity = Vector3.zero;
+            float offset = transform.position.z + pieceZ;
+            piece.transform.position = GetRandomSpawnPos(offset);
+            PieceMovement pieceMovement = piece.gameObject.GetComponent<PieceMovement>();
+            pieceMovement.SetStartingPositions();
+        }
     }
 }

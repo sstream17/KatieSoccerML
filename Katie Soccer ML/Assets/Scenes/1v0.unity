@@ -263,11 +263,6 @@ PrefabInstance:
       propertyPath: m_LocalPosition.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 3639823685003595367, guid: db39c97977f1ece47b979ff6f5896d2d,
-        type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 70
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: db39c97977f1ece47b979ff6f5896d2d, type: 3}
 --- !u!1 &519420028
@@ -430,11 +425,6 @@ PrefabInstance:
       propertyPath: m_LocalPosition.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 3639823685003595367, guid: db39c97977f1ece47b979ff6f5896d2d,
-        type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 270
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: db39c97977f1ece47b979ff6f5896d2d, type: 3}
 --- !u!1001 &810940930
@@ -513,11 +503,6 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalPosition.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3639823685003595367, guid: db39c97977f1ece47b979ff6f5896d2d,
-        type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 170
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: db39c97977f1ece47b979ff6f5896d2d, type: 3}
@@ -743,10 +728,20 @@ PrefabInstance:
       propertyPath: academy
       value: 
       objectReference: {fileID: 1479792064}
-    - target: {fileID: 3639823685003595367, guid: db39c97977f1ece47b979ff6f5896d2d,
+    - target: {fileID: 2329796376684177774, guid: db39c97977f1ece47b979ff6f5896d2d,
         type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: -30
+      propertyPath: m_fontSizeBase
+      value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 2329796376684177774, guid: db39c97977f1ece47b979ff6f5896d2d,
+        type: 3}
+      propertyPath: m_textInfo.characterCount
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 2329796376684177774, guid: db39c97977f1ece47b979ff6f5896d2d,
+        type: 3}
+      propertyPath: m_textInfo.lineCount
+      value: 6
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: db39c97977f1ece47b979ff6f5896d2d, type: 3}
